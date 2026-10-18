@@ -1,0 +1,22 @@
+{
+  "name": "berno-works",
+  "owner": {
+    "name": "Berno Works"
+  },
+  "description": "Berno Works' personal Claude Code environment bundle",
+  "allowCrossMarketplaceDependenciesOn": [
+    "claude-plugins-official",
+    "plannotator",
+    "trailofbits",
+    "astral-sh",
+    "pydantic-skills",
+    "worktrunk"
+  ],
+  "plugins": [
+    {
+      "name": "berno-works-plugin",
+      "source": "./",
+      "description": "Berno Works' curated Claude Code environment: Superpowers workflow, modern typed Python, FastAPI/Pydantic/SQLAlchemy and React/Tailwind/shadcn skills"
+    }
+  ]
+}
