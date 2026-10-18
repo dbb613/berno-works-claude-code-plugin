@@ -63,9 +63,11 @@ if safe_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     # Content filters (filter.<name>.clean/process) can't be switched off by name, so
     # skip the dirty check when the repo's own config defines any. Filters from your
     # global or system config (e.g. git-lfs) are yours and still apply.
-    repo_filters=$(safe_git config --show-scope --includes --get-regexp '^filter\.' 2>/dev/null \
-      | grep -Ev '^(global|system|command)[[:space:]]')
-    if [ -z "$repo_filters" ]; then
+    # Fail closed: run diff only when git config answers cleanly (1 = no filters at all,
+    # 0 = filters, all from global/system). Any error (e.g. git < 2.26) skips the check.
+    filters=$(safe_git config --show-scope --includes --get-regexp '^filter\.' 2>/dev/null)
+    rc=$?
+    if [ $rc -eq 1 ] || { [ $rc -eq 0 ] && [ -z "$(printf '%s\n' "$filters" | grep -Ev '^(global|system|command)[[:space:]]')" ]; }; then
       safe_git diff --no-ext-diff --no-textconv --quiet --ignore-submodules -- 2>/dev/null || dirty="*"
     fi
     git_seg=$(printf "${YELLOW} (%s%s)${RESET}" "$branch" "$dirty")

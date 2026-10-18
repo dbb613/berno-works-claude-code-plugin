@@ -50,6 +50,16 @@ test_included_filter_cannot_run() {
   [ ! -e "$tmp/pwned-include" ] && pass "${FUNCNAME[0]}" || fail "${FUNCNAME[0]}" "included filter executed"
 }
 
+test_fails_closed_when_config_check_errors() {
+  # Simulate an old git where `config --show-scope` is unsupported.
+  mkdir -p "$tmp/oldgit"
+  printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = config ] && exit 129; done\nexec %s "$@"\n' "$(command -v git)" > "$tmp/oldgit/git"
+  chmod +x "$tmp/oldgit/git"
+  rm -f "$tmp"/pwned-*
+  printf '%s' "$input" | PATH="$tmp/oldgit:$PATH" bash "$root/statusline/statusline-command.sh" >/dev/null 2>&1
+  ! ls "$tmp" | grep -q pwned && pass "${FUNCNAME[0]}" || fail "${FUNCNAME[0]}" "ran diff after the filter check failed"
+}
+
 test_still_shows_branch_and_dirty() {
   plain_input="{\"workspace\":{\"current_dir\":\"$plain\"},\"model\":{\"display_name\":\"Opus\"}}"
   out="$(printf '%s' "$plain_input" | bash "$root/statusline/statusline-command.sh" 2>&1)"
@@ -58,6 +68,7 @@ test_still_shows_branch_and_dirty() {
 
 test_repo_config_cannot_run_commands
 test_included_filter_cannot_run
+test_fails_closed_when_config_check_errors
 test_still_shows_branch_and_dirty
 [ $fails -eq 0 ] && echo "ALL PASS" || echo "$fails FAILED"
 exit $fails
