@@ -11,12 +11,24 @@ your projects.
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/dbb613/berno-works-claude-code-plugin/main/scripts/install.sh | bash
+```
+
+Then start a new session, or run `/reload-plugins` in an open one. The
+script is safe to re-run.
+
+Why a script and not just `claude plugin install`? Claude Code (checked on
+2.1.302) only installs a dependency from a marketplace you've already added,
+and it installs just **one** missing dependency per install operation. The
+script adds the six source marketplaces and installs each dependency
+explicitly. To do it by hand, run `claude plugin marketplace add` for each
+repo in `MARKETPLACE_REPOS` in [`scripts/install.sh`](scripts/install.sh),
+then `claude plugin install` for each entry in `DEPENDENCIES`, then:
+
+```sh
 claude plugin marketplace add dbb613/berno-works-claude-code-plugin
 claude plugin install berno-works-plugin@berno-works
 ```
-
-Installing the plugin installs every dependency below. Start a new session
-(or run `/reload-plugins`) afterwards.
 
 ## Prerequisites
 
@@ -98,4 +110,5 @@ claude plugin validate --strict .                          # marketplace
 claude plugin validate --strict .claude-plugin/plugin.json # plugin
 bash tests/test-session-start.sh
 bash tests/test-vendored.sh
+bash tests/test-install-lists.sh   # install.sh matches the manifests
 ```
