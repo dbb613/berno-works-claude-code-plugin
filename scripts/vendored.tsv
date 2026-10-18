@@ -1,0 +1,5 @@
+# folder	repo	path	license
+fastapi	fastapi/fastapi	fastapi/.agents/skills/fastapi	MIT
+shadcn	shadcn-ui/ui	skills/shadcn	MIT
+vercel-react-best-practices	vercel-labs/agent-skills	skills/react-best-practices	MIT
+tailwind-design-system	wshobson/agents	plugins/frontend-mobile-development/skills/tailwind-design-system	MIT
