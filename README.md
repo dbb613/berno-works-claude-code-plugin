@@ -146,6 +146,7 @@ Install these yourself if you want them: `playwright`, `commit-commands`,
 claude plugin validate .                          # marketplace
 claude plugin validate .claude-plugin/plugin.json # plugin (warns: no version, on purpose)
 bash tests/test-session-start.sh
+bash tests/test-statusline.sh        # repo git config cannot run commands
 bash tests/test-vendored.sh
 bash tests/test-install-lists.sh     # install.sh matches the manifests
 bash tests/test-install-script.sh    # install.sh keeps going and updates

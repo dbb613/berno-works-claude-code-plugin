@@ -49,12 +49,18 @@ RESET='\033[00m'
 out=$(printf "%s${GREEN}%s@%s${RESET}:${BLUE}%s${RESET}" "$chroot_prefix" "$user" "$host" "$dir_display")
 
 # --- Git branch + dirty marker (skip optional locks; safe in any repo state) ---
-if git -C "$cwd" --no-optional-locks rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  branch=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null \
-    || git -C "$cwd" --no-optional-locks rev-parse --short HEAD 2>/dev/null)
+# The status line runs in whatever folder Claude is open in, including untrusted
+# clones, so neutralise repo config that would run commands (fsmonitor, external
+# diff, textconv) on every refresh.
+safe_git() {
+  git -C "$cwd" --no-optional-locks -c core.fsmonitor= -c diff.external= -c core.hooksPath=/dev/null "$@"
+}
+if safe_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  branch=$(safe_git symbolic-ref --short HEAD 2>/dev/null \
+    || safe_git rev-parse --short HEAD 2>/dev/null)
   if [ -n "$branch" ]; then
     dirty=""
-    git -C "$cwd" --no-optional-locks diff --quiet --ignore-submodules -- 2>/dev/null || dirty="*"
+    safe_git diff --no-ext-diff --no-textconv --quiet --ignore-submodules -- 2>/dev/null || dirty="*"
     git_seg=$(printf "${YELLOW} (%s%s)${RESET}" "$branch" "$dirty")
     out="${out}${git_seg}"
   fi
