@@ -1,6 +1,5 @@
 {
   "name": "berno-works-plugin",
-  "version": "1.2.0",
   "description": "Streamline setting up consistent Claude Code configuration across my projects",
   "author": {
     "name": "Berno Works",
@@ -9,19 +8,61 @@
   "repository": "https://github.com/dbb613/berno-works-claude-code-plugin",
   "license": "MIT",
   "dependencies": [
-    { "name": "superpowers", "marketplace": "claude-plugins-official" },
-    { "name": "context7", "marketplace": "claude-plugins-official" },
-    { "name": "pyright-lsp", "marketplace": "claude-plugins-official" },
-    { "name": "typescript-lsp", "marketplace": "claude-plugins-official" },
-    { "name": "frontend-design", "marketplace": "claude-plugins-official" },
-    { "name": "github", "marketplace": "claude-plugins-official" },
-    { "name": "code-review", "marketplace": "claude-plugins-official" },
-    { "name": "skill-creator", "marketplace": "claude-plugins-official" },
-    { "name": "plannotator", "marketplace": "plannotator" },
-    { "name": "modern-python", "marketplace": "trailofbits" },
-    { "name": "astral", "marketplace": "astral-sh" },
-    { "name": "pydantic", "marketplace": "pydantic-skills" },
-    { "name": "ai", "marketplace": "pydantic-skills" },
-    { "name": "worktrunk", "marketplace": "worktrunk" }
+    {
+      "name": "superpowers",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "context7",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "pyright-lsp",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "typescript-lsp",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "frontend-design",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "github",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "code-review",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "skill-creator",
+      "marketplace": "claude-plugins-official"
+    },
+    {
+      "name": "plannotator",
+      "marketplace": "plannotator"
+    },
+    {
+      "name": "modern-python",
+      "marketplace": "trailofbits"
+    },
+    {
+      "name": "astral",
+      "marketplace": "astral-sh"
+    },
+    {
+      "name": "pydantic",
+      "marketplace": "pydantic-skills"
+    },
+    {
+      "name": "ai",
+      "marketplace": "pydantic-skills"
+    },
+    {
+      "name": "worktrunk",
+      "marketplace": "worktrunk"
+    }
   ]
 }

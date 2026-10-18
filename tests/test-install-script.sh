@@ -16,9 +16,33 @@ exit 0
 STUB
 chmod +x "$tmp/bin/claude"
 
+export CLAUDE_CONFIG_DIR="$tmp/config"
+
 run() {  # run <failing-arg>
   : > "$tmp/log"
+  mkdir -p "$CLAUDE_CONFIG_DIR"
+  cat > "$CLAUDE_CONFIG_DIR/settings.json" <<'JSON'
+{"hooks": {"Stop": []}, "theme": "dark",
+ "extraKnownMarketplaces": {
+   "berno-works": {"source": {"source": "github", "repo": "dbb613/berno-works-claude-code-plugin"}},
+   "trailofbits": {"source": {"source": "github", "repo": "trailofbits/skills"}}}}
+JSON
   out="$(PATH="$tmp/bin:$PATH" CLAUDE_STUB_LOG="$tmp/log" CLAUDE_STUB_FAIL="$1" bash "$root/scripts/install.sh" 2>&1)"; rc=$?
+}
+
+test_merges_user_settings() {
+  run "no-such-arg"
+  python3 - "$CLAUDE_CONFIG_DIR/settings.json" <<'PY' && pass "test_merges_user_settings" || fail "test_merges_user_settings" "$out"
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert s["theme"] == "dark" and s["hooks"] == {"Stop": []}, "existing keys lost"
+assert s["statusLine"] == {"type": "command", "command": "bash ~/.claude/berno-works-statusline.sh"}, s.get("statusLine")
+assert s["tui"] == "fullscreen" and s["agentPushNotifEnabled"] is True
+m = s["extraKnownMarketplaces"]
+assert m["berno-works"]["autoUpdate"] is True and m["trailofbits"]["autoUpdate"] is True
+assert m["berno-works"]["source"]["repo"] == "dbb613/berno-works-claude-code-plugin", "source clobbered"
+assert "pydantic-skills" not in m, "created an entry the CLI never wrote"
+PY
 }
 
 test_continues_after_marketplace_add_fails() {
@@ -42,5 +66,6 @@ test_updates_existing_install() {
 test_continues_after_marketplace_add_fails
 test_continues_after_install_fails
 test_updates_existing_install
+test_merges_user_settings
 [ $fails -eq 0 ] && echo "ALL PASS" || echo "$fails FAILED"
 exit $fails

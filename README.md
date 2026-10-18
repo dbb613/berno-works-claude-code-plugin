@@ -44,6 +44,10 @@ one-line warning for each of these that's missing from `PATH`:
 | `typescript-language-server` | `typescript-lsp` live diagnostics | `npm i -g typescript-language-server typescript` |
 | `plannotator` | Plannotator plan review | see [backnotprop/plannotator](https://github.com/backnotprop/plannotator) |
 | `node` | `npx`, the TypeScript language server | https://nodejs.org |
+| `jq` | the status line | your package manager |
+| `atuin` | shell history of Bash tool calls (optional) | https://atuin.sh |
+
+`install.sh` also needs `python3` to merge user settings.
 
 ## What's included
 
@@ -74,6 +78,21 @@ the source commit)
 | `shadcn` | [shadcn-ui/ui](https://github.com/shadcn-ui/ui) |
 | `vercel-react-best-practices` | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) |
 | `tailwind-design-system` | [wshobson/agents](https://github.com/wshobson/agents) |
+| `find-skills` | [vercel-labs/skills](https://github.com/vercel-labs/skills) |
+| `plannotator`, `plannotator-annotate`, `-last`, `-review`, `-compound`, `-setup-goal`, `-visual-explainer` | [backnotprop/plannotator](https://github.com/backnotprop/plannotator) (Apache-2.0) |
+
+**Personal environment**
+
+- **Status line** (`statusline/statusline-command.sh`): copied to
+  `~/.claude/berno-works-statusline.sh` at every session start, so it
+  updates with the plugin.
+- **Atuin hooks**: Bash tool calls are recorded in atuin history
+  (`hooks/atuin.sh`; does nothing if atuin isn't installed).
+- **User settings** written by `install.sh` (other keys are kept): status
+  line, `tui: fullscreen`, `agentPushNotifEnabled`, and auto-update on for
+  every marketplace above.
+- **Not set for you:** `skipDangerousModePermissionPrompt`. It turns off a
+  safety prompt, so set it yourself in `~/.claude/settings.json` if you want it.
 
 ## Customizing
 
@@ -86,12 +105,18 @@ instead of forking Superpowers.
 
 ## Releasing a change
 
-1. Bump `version` in `.claude-plugin/plugin.json`. Installed copies only
-   update when the version changes, so a push without a bump never reaches
-   your other machines.
-2. Commit and push.
-3. On each machine, re-run the install one-liner. It refreshes the
-   marketplace, installs any newly added dependency, and updates the plugin.
+Commit and push. That's it for most changes.
+
+`plugin.json` deliberately has no `version`, so every commit is a new
+version, and `install.sh` turns on auto-update for the marketplace. Each
+machine picks up the push in its next interactive session (within about ten
+minutes of your first message; run `/reload-plugins` to apply it right away,
+otherwise it applies at the next launch). One install covers every project
+on the machine.
+
+Re-run the install one-liner on each machine when you **add a dependency**
+or **change the user settings** in `install.sh`. Auto-update doesn't do
+those.
 
 ## Updating vendored skills
 
@@ -118,8 +143,8 @@ Install these yourself if you want them: `playwright`, `commit-commands`,
 ## Development
 
 ```sh
-claude plugin validate --strict .                          # marketplace
-claude plugin validate --strict .claude-plugin/plugin.json # plugin
+claude plugin validate .                          # marketplace
+claude plugin validate .claude-plugin/plugin.json # plugin (warns: no version, on purpose)
 bash tests/test-session-start.sh
 bash tests/test-vendored.sh
 bash tests/test-install-lists.sh     # install.sh matches the manifests

@@ -60,6 +60,33 @@ for plugin in "${DEPENDENCIES[@]}" berno-works-plugin@berno-works; do
 done
 step "update berno-works-plugin" plugin update berno-works-plugin@berno-works
 
+# User settings a plugin can't carry. Existing keys are kept; marketplaces get
+# auto-update so every push reaches this machine (the official one has it already).
+echo "→ user settings"
+settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+if ! python3 - "$settings" berno-works plannotator trailofbits astral-sh pydantic-skills worktrunk <<'PY'
+import json, os, sys
+path, markets = sys.argv[1], sys.argv[2:]
+settings = json.load(open(path)) if os.path.exists(path) else {}
+settings.update({
+    "statusLine": {"type": "command", "command": "bash ~/.claude/berno-works-statusline.sh"},
+    "tui": "fullscreen",
+    "agentPushNotifEnabled": True,
+})
+known = settings.setdefault("extraKnownMarketplaces", {})
+for name in markets:
+    if name in known:  # only entries `marketplace add` wrote; never invent a source
+        known[name]["autoUpdate"] = True
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(path + ".tmp", "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+os.replace(path + ".tmp", path)
+PY
+then
+  failed+=("user settings (needs python3)")
+fi
+
 if [ ${#failed[@]} -gt 0 ]; then
   echo
   echo "Finished with ${#failed[@]} failed step(s):" >&2

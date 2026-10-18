@@ -3,3 +3,11 @@ fastapi	fastapi/fastapi	fastapi/.agents/skills/fastapi	MIT
 shadcn	shadcn-ui/ui	skills/shadcn	MIT
 vercel-react-best-practices	vercel-labs/agent-skills	skills/react-best-practices	MIT
 tailwind-design-system	wshobson/agents	plugins/frontend-mobile-development/skills/tailwind-design-system	MIT
+find-skills	vercel-labs/skills	skills/find-skills	MIT
+plannotator	backnotprop/plannotator	apps/skills/core/plannotator	Apache-2.0
+plannotator-annotate	backnotprop/plannotator	apps/skills/claude/plannotator-annotate	Apache-2.0
+plannotator-last	backnotprop/plannotator	apps/skills/claude/plannotator-last	Apache-2.0
+plannotator-review	backnotprop/plannotator	apps/skills/claude/plannotator-review	Apache-2.0
+plannotator-compound	backnotprop/plannotator	apps/skills/extra/plannotator-compound	Apache-2.0
+plannotator-setup-goal	backnotprop/plannotator	apps/skills/extra/plannotator-setup-goal	Apache-2.0
+plannotator-visual-explainer	backnotprop/plannotator	apps/skills/extra/plannotator-visual-explainer	Apache-2.0
