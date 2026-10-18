@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Re-fetch every skill in scripts/vendored.tsv at upstream HEAD into skills/<folder>/.
-# Folders whose upstream SHA is unchanged are left untouched, so a rerun is a no-op.
+# A skill is identified by the last upstream commit that touched its own path, so folders
+# whose skill hasn't changed upstream are left untouched and a rerun is a no-op.
 # Review the resulting git diff before committing.
 set -euo pipefail
 
@@ -13,8 +14,8 @@ while IFS=$'\t' read -r folder repo path license; do
   if [ -z "$folder" ] || [ "${folder#\#}" != "$folder" ]; then continue; fi
   dest="$root/skills/$folder"
 
-  if ! sha="$(gh api "repos/$repo/commits/HEAD" --jq .sha)"; then
-    echo "error: could not resolve HEAD of $repo; skipping $folder" >&2
+  if ! sha="$(gh api "repos/$repo/commits?path=$path&per_page=1" --jq '.[0].sha' </dev/null)" || [ -z "$sha" ]; then
+    echo "error: could not resolve the last commit for $repo/$path; skipping $folder" >&2
     status=1; continue
   fi
   if grep -qx -- "- Commit: $sha" "$dest/UPSTREAM.md" 2>/dev/null; then
@@ -33,6 +34,14 @@ while IFS=$'\t' read -r folder repo path license; do
   rm -rf "$dest"
   mkdir -p "$dest"
   cp -R "$clone/$path/." "$dest/"
+  # MIT requires the copyright notice to travel with the copy.
+  license_file="$(cd "$clone" && ls LICENSE* LICENCE* 2>/dev/null | head -1 || true)"
+  if [ -n "$license_file" ]; then
+    cp "$clone/$license_file" "$dest/LICENSE.upstream"
+    license_source="LICENSE.upstream (copied from the repository root)"
+  else
+    license_source="the \`license:\` field in SKILL.md frontmatter; the repository has no LICENSE file"
+  fi
   cat > "$dest/UPSTREAM.md" <<MD
 # Upstream source
 
@@ -40,8 +49,9 @@ Vendored unchanged by \`scripts/update-vendored.sh\`. Do not edit by hand.
 
 - Repository: https://github.com/$repo
 - Path: $path
-- Commit: $(git -C "$clone" rev-parse HEAD)
+- Commit: $sha
 - License: $license
+- License source: $license_source
 - Fetched: $(date -u +%Y-%m-%d)
 MD
   echo "$folder: updated to $sha"

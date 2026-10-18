@@ -4,6 +4,7 @@ Vendored unchanged by `scripts/update-vendored.sh`. Do not edit by hand.
 
 - Repository: https://github.com/shadcn-ui/ui
 - Path: skills/shadcn
-- Commit: d2fba50ee5b9113008b5bb908563527b7efd2f27
+- Commit: 4233ed1caded8c38f4bc14b14afe1f93ebcaf966
 - License: MIT
+- License source: LICENSE.upstream (copied from the repository root)
 - Fetched: 2026-10-18

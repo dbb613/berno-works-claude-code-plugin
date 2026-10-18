@@ -27,11 +27,11 @@ test_prints_preferences() {
 test_warns_missing() {
   p="$(make_path none)"
   out="$(PATH="$p" CLAUDE_PLUGIN_ROOT="$root" "$p/bash" "$hook" 2>&1)"
-  [[ "$out" == *"'uv' not found"* && "$out" == *"'plannotator' not found"* ]] && pass "${FUNCNAME[0]}" || fail "${FUNCNAME[0]}" "expected missing-tool warnings, got: $out"
+  [[ "$out" == *"'uv' not found"* && "$out" == *"'plannotator' not found"* && "$out" == *"'typescript-language-server' not found"* && "$out" == *"'pyright-langserver' not found"* ]] && pass "${FUNCNAME[0]}" || fail "${FUNCNAME[0]}" "expected missing-tool warnings, got: $out"
 }
 
 test_no_warnings_when_present() {
-  p="$(make_path all uv ruff ty pyright plannotator node)"
+  p="$(make_path all uv ruff ty pyright-langserver typescript-language-server plannotator node)"
   out="$(PATH="$p" CLAUDE_PLUGIN_ROOT="$root" "$p/bash" "$hook" 2>&1)"
   [ -n "$first_line" ] && [[ "$out" == *"$first_line"* && "$out" != *"not found"* ]] && pass "${FUNCNAME[0]}" || fail "${FUNCNAME[0]}" "unexpected warning in: $out"
 }

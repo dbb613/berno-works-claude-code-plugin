@@ -14,9 +14,10 @@ done <<'TOOLS'
 uv Python projects and dependencies
 ruff Python lint and format
 ty Python type checking
-pyright pyright-lsp diagnostics
+pyright-langserver pyright-lsp diagnostics
+typescript-language-server typescript-lsp diagnostics
 plannotator Plannotator plan review
-node vendored-skill updates and npx
+node npx and the TypeScript language server
 TOOLS
 
 if [ -n "$missing" ]; then

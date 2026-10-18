@@ -40,9 +40,10 @@ one-line warning for each of these that's missing from `PATH`:
 | `uv` | Python projects | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `ruff` | lint and format | `uv tool install ruff` |
 | `ty` | type checking | `uv tool install ty` |
-| `pyright` | `pyright-lsp` live diagnostics | `npm i -g pyright` or `uv tool install pyright` |
+| `pyright-langserver` | `pyright-lsp` live diagnostics | `npm i -g pyright` or `uv tool install pyright` |
+| `typescript-language-server` | `typescript-lsp` live diagnostics | `npm i -g typescript-language-server typescript` |
 | `plannotator` | Plannotator plan review | see [backnotprop/plannotator](https://github.com/backnotprop/plannotator) |
-| `node` | `npx`, `typescript-lsp` | https://nodejs.org |
+| `node` | `npx`, the TypeScript language server | https://nodejs.org |
 
 ## What's included
 
@@ -76,10 +77,21 @@ the source commit)
 
 ## Customizing
 
-Edit [`hooks/preferences.md`](hooks/preferences.md). It's loaded at the
-start of every session as your standing instructions, and it takes
-precedence over skill defaults, including Superpowers. Add workflow tweaks
-under "Superpowers workflow preferences" instead of forking Superpowers.
+Edit [`hooks/preferences.md`](hooks/preferences.md) **in this repo** (not
+the installed copy under `~/.claude/plugins/cache`, which is replaced on
+update). It's loaded at the start of every session as your standing
+instructions, and it takes precedence over skill defaults, including
+Superpowers. Add workflow tweaks under "Superpowers workflow preferences"
+instead of forking Superpowers.
+
+## Releasing a change
+
+1. Bump `version` in `.claude-plugin/plugin.json`. Installed copies only
+   update when the version changes, so a push without a bump never reaches
+   your other machines.
+2. Commit and push.
+3. On each machine, re-run the install one-liner. It refreshes the
+   marketplace, installs any newly added dependency, and updates the plugin.
 
 ## Updating vendored skills
 
@@ -110,5 +122,7 @@ claude plugin validate --strict .                          # marketplace
 claude plugin validate --strict .claude-plugin/plugin.json # plugin
 bash tests/test-session-start.sh
 bash tests/test-vendored.sh
-bash tests/test-install-lists.sh   # install.sh matches the manifests
+bash tests/test-install-lists.sh     # install.sh matches the manifests
+bash tests/test-install-script.sh    # install.sh keeps going and updates
+bash tests/test-vendored-commits.sh  # network: vendored commits are current
 ```

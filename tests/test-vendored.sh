@@ -10,6 +10,7 @@ while IFS=$'\t' read -r folder repo path license; do
   name="$(sed -n 's/^name:[[:space:]]*//p' "$dir/SKILL.md" | head -1 | tr -d '"'"'")"
   [ "$name" = "$folder" ] || { echo "FAIL $folder: frontmatter name is '$name'"; fail=1; }
   grep -q "^- Commit: [0-9a-f]\{40\}$" "$dir/UPSTREAM.md" 2>/dev/null || { echo "FAIL $folder: UPSTREAM.md lacks commit SHA"; fail=1; }
+  { [ -s "$dir/LICENSE.upstream" ] || grep -q "^- License source: " "$dir/UPSTREAM.md" 2>/dev/null; } || { echo "FAIL $folder: no upstream license notice"; fail=1; }
   grep -q "^- Repository: https://github.com/$repo$" "$dir/UPSTREAM.md" 2>/dev/null || { echo "FAIL $folder: UPSTREAM.md lacks repository"; fail=1; }
 done < "$root/scripts/vendored.tsv"
 [ $fail -eq 0 ] && echo "PASS vendored skills"
