@@ -31,12 +31,17 @@ while IFS=$'\t' read -r folder repo path license; do
     status=1; continue
   fi
 
+  if [ -n "$(find "$clone/$path" -type l)" ]; then
+    echo "error: $repo/$path contains symlinks; refusing to vendor $folder" >&2
+    status=1; continue
+  fi
   rm -rf "$dest"
   mkdir -p "$dest"
   cp -R "$clone/$path/." "$dest/"
   # MIT requires the copyright notice to travel with the copy.
   license_file="$(cd "$clone" && ls LICENSE* LICENCE* 2>/dev/null | head -1 || true)"
-  if [ -n "$license_file" ]; then
+  # Refuse symlinks: an upstream LICENSE linking to a local file would copy that file here.
+  if [ -n "$license_file" ] && [ -f "$clone/$license_file" ] && [ ! -L "$clone/$license_file" ]; then
     cp "$clone/$license_file" "$dest/LICENSE.upstream"
     license_source="LICENSE.upstream (copied from the repository root)"
   else
