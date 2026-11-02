@@ -30,10 +30,12 @@ On a clean, up-to-date `main` (`git switch main && git pull`):
 $PG new --tech "<tech>" --use-case "<use case>" --kind <kind> \
   --mode <mode> --durability <durability> --question "<q1>" --question "<q2>"
 git switch -c pg/<slug>          # the untracked new files come along
-git add pg/<slug> && git commit -m "pg(<slug>): scaffold" && git push -u origin pg/<slug>
+git add pg/<slug> && git commit -m "pg(<slug>): scaffold"
 ```
 
-Nothing is ever committed on `main` directly.
+Nothing is ever committed on `main` directly. Push a **durable** branch
+(`git push -u origin pg/<slug>`) so it's backed up. A **throwaway** branch can
+stay local unless the user wants it pushed.
 
 ## 3. Research
 
@@ -58,7 +60,7 @@ One directory per question: `experiments/NN-<short-name>/` (`01-streaming`,
 
 After each answered question, update `playground.json` (`answer`,
 `confidence`) and the question's section in `FINDINGS.md`, run
-`$PG validate <slug>`, commit and push.
+`$PG validate <slug>`, and commit (and push, if the branch is pushed).
 
 **Guided:** write and run experiment 01 yourself as a working starting point,
 show the result, then pair: the user drives, you help, and you keep
@@ -80,31 +82,34 @@ When the user says they're done (guided) or confirms the draft (autopilot):
 2. Set `status: concluded`, `concluded: <today>`, `verdict`, and
    `verdict_draft: false`. Remove **DRAFT** from `FINDINGS.md`. Write the
    verdict reasoning and "Next steps if adopted".
-3. `$PG validate <slug>`, then commit and push the branch.
+3. `$PG validate <slug>`, then commit.
 4. Merge to `main` by draft PR:
    - **Durable:**
      ```sh
      git fetch origin && git merge --no-edit origin/main   # so the index includes everything merged since
-     $PG index && git add INDEX.md && git commit -m "pg(<slug>): index" && git push
+     $PG index && git add INDEX.md && git commit -m "pg(<slug>): index"
+     git push -u origin pg/<slug> && gh pr create --draft --base main
      ```
      If that merge conflicts only in `INDEX.md`, take either side and let
      `$PG index` regenerate it.
-     then open a PR from `pg/<slug>` to `main`.
+     That opens the PR from `pg/<slug>` to `main`.
    - **Throwaway:** findings only.
      ```sh
      git fetch origin
-     files=$($PG findings-files <slug> --ref origin/pg/<slug>) && [ -n "$files" ]   # stop if this fails
+     files=$($PG findings-files <slug> --ref pg/<slug>) && [ -n "$files" ]   # stop if this fails
      git switch -c pg/<slug>-findings origin/main
-     git checkout origin/pg/<slug> -- $files
+     git checkout pg/<slug> -- $files
      $PG index
-     git add -A && git commit -m "pg(<slug>): findings" && git push -u origin pg/<slug>-findings
+     git add -A && git commit -m "pg(<slug>): findings"
+     git push -u origin pg/<slug>-findings && gh pr create --draft --base main
      ```
      Run these one at a time and check each succeeded. In particular, never
-     run `git checkout origin/pg/<slug> --` with an empty file list: that
+     run `git checkout pg/<slug> --` with an empty file list: that
      switches branches instead of copying files.
-     then open a PR from `pg/<slug>-findings` to `main`. Tell the user the code
-     stays on `pg/<slug>` until `/playground clean`, and `/playground promote`
-     can still bring it in.
+     Tell the user the code stays on the local `pg/<slug>` branch until
+     `/playground clean`, and that `/playground promote` can still bring it
+     in. If `pg/<slug>` exists only on origin, use `origin/pg/<slug>` in the
+     two commands above.
 
    If `INDEX.md` conflicts with another merged PR later, re-run `$PG index`
    on the merged result instead of hand-merging the table.

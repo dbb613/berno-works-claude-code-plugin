@@ -396,38 +396,50 @@ def read_meta_at(root: Path, ref: str, slug: str) -> dict | None:
     return meta if isinstance(meta, dict) else None
 
 
+def pg_branches(root: Path) -> dict[str, dict[str, tuple[str, int]]]:
+    """pg/* branches -> {"local"|"remote": (ref, committer unix time)}."""
+    out = git(
+        "for-each-ref", "--format=%(refname)%09%(committerdate:unix)",
+        "refs/heads/pg/", "refs/remotes/origin/pg/", cwd=root,
+    ).stdout.splitlines()
+    branches: dict[str, dict[str, tuple[str, int]]] = {}
+    for line in out:
+        ref, _, stamp = line.partition("\t")
+        if ref.startswith("refs/heads/"):
+            name, where = ref[len("refs/heads/"):], "local"
+        else:
+            name, where = ref[len("refs/remotes/origin/"):], "remote"
+        branches.setdefault(name, {})[where] = (ref, int(stamp or 0))
+    return branches
+
+
 def cmd_clean(args: argparse.Namespace) -> int:
     root = repo_root()
     require_playgrounds(root)
-    if git("remote", "get-url", "origin", cwd=root).returncode != 0:
-        raise PgError("no 'origin' remote")
-    if git("rev-parse", "--verify", "--quiet", f"{args.base}^{{commit}}", cwd=root).returncode != 0:
-        raise PgError(f"base ref '{args.base}' not found; run git fetch origin")
-    refs = git(
-        "for-each-ref", "--format=%(refname:short)%09%(committerdate:unix)",
-        "refs/remotes/origin/pg/", cwd=root,
-    ).stdout.splitlines()
+    has_origin = git("remote", "get-url", "origin", cwd=root).returncode == 0
+    base = args.base or ("origin/main" if has_origin else "main")
+    if git("rev-parse", "--verify", "--quiet", f"{base}^{{commit}}", cwd=root).returncode != 0:
+        hint = "; run git fetch origin" if base.startswith("origin/") else ""
+        raise PgError(f"base ref '{base}' not found{hint}")
     now = time.time()
     harvested: list[str] = []
-    stale: list[tuple[str, int]] = []
-    for line in refs:
-        ref, _, stamp = line.partition("\t")
-        branch = ref[len("origin/"):]
+    stale: list[str] = []
+    for branch, places in sorted(pg_branches(root).items()):
+        where = "both" if len(places) == 2 else next(iter(places))
         slug = branch[len("pg/"):]
         if slug.endswith("-findings"):
             slug = slug[: -len("-findings")]
-        on_base = read_meta_at(root, args.base, slug)
+        on_base = read_meta_at(root, base, slug)
         if on_base and on_base.get("status") in ("concluded", "abandoned"):
-            harvested.append(branch)
+            harvested.append(f"harvested\t{branch}\t{where}")
             continue
+        ref = places.get("local", places.get("remote"))[0]
         own = read_meta_at(root, ref, slug)
-        age = int((now - int(stamp or 0)) // 86400)
+        age = int((now - max(t for _, t in places.values())) // 86400)
         if own and own.get("status") == "active" and age > args.days:
-            stale.append((branch, age))
-    for branch in harvested:
-        print(f"harvested\t{branch}")
-    for branch, age in stale:
-        print(f"stale\t{branch}\t{age}")
+            stale.append(f"stale\t{branch}\t{age}\t{where}")
+    for line in harvested + stale:
+        print(line)
     return 0
 
 
@@ -450,8 +462,8 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("slug")
     f.add_argument("--ref", help="read the playground from this git ref instead of the working tree")
     f.set_defaults(func=cmd_findings_files)
-    c = sub.add_parser("clean", help="list harvested and stale pg/* branches")
-    c.add_argument("--base", default="origin/main")
+    c = sub.add_parser("clean", help="list harvested and stale pg/* branches (local and origin)")
+    c.add_argument("--base", help="default: origin/main, or main when there is no origin")
     c.add_argument("--days", type=int, default=30)
     c.set_defaults(func=cmd_clean)
     v = sub.add_parser("validate", help="check playground.json files")

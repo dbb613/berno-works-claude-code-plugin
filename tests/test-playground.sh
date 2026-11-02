@@ -294,6 +294,10 @@ branch_pg() {
 branch_pg pg/2026-10-01-harv harv
 branch_pg pg/2026-10-01-old old GIT_COMMITTER_DATE=2020-01-01T00:00:00
 branch_pg pg/2026-10-01-fresh fresh
+# A stale playground that was never pushed (local branch only).
+(cd "$C" && git switch -q -c pg/2026-10-01-loc main \
+  && pg new --tech loc --use-case u --kind bare --mode guided --durability throwaway --date 2026-10-01 >/dev/null \
+  && git add -A && GIT_COMMITTER_DATE=2020-01-01T00:00:00 gitc commit -qm loc && git switch -q main)
 # Harvest "harv": its concluded findings land on main, plus a -findings branch.
 (cd "$C" && git checkout -q pg/2026-10-01-harv -- pg/2026-10-01-harv/playground.json \
   && jset pg/2026-10-01-harv/playground.json "d.update(status='concluded', concluded='2026-10-02', verdict='hold')" \
@@ -302,15 +306,19 @@ branch_pg pg/2026-10-01-fresh fresh
 CLEAN_OUT="$(cd "$C" && pg clean 2>&1)"; CLEAN_RC=$?
 
 test_clean_harvested() {
-  [ $CLEAN_RC -eq 0 ] && grep -qxP 'harvested\tpg/2026-10-01-harv' <<<"$CLEAN_OUT" \
+  [ $CLEAN_RC -eq 0 ] && grep -qxP 'harvested\tpg/2026-10-01-harv\tboth' <<<"$CLEAN_OUT" \
     && pass clean_harvested || fail clean_harvested "rc=$CLEAN_RC out=$CLEAN_OUT"
 }
 test_clean_findings_branch() {
-  grep -qxP 'harvested\tpg/2026-10-01-harv-findings' <<<"$CLEAN_OUT" \
+  grep -qxP 'harvested\tpg/2026-10-01-harv-findings\tremote' <<<"$CLEAN_OUT" \
     && pass clean_findings_branch || fail clean_findings_branch "out=$CLEAN_OUT"
 }
 test_clean_stale() {
-  grep -qP '^stale\tpg/2026-10-01-old\t[0-9]+$' <<<"$CLEAN_OUT" && pass clean_stale || fail clean_stale "out=$CLEAN_OUT"
+  grep -qP '^stale\tpg/2026-10-01-old\t[0-9]+\tboth$' <<<"$CLEAN_OUT" && pass clean_stale || fail clean_stale "out=$CLEAN_OUT"
+}
+test_clean_local_only_branch() {
+  grep -qP '^stale\tpg/2026-10-01-loc\t[0-9]+\tlocal$' <<<"$CLEAN_OUT" \
+    && pass clean_local_only_branch || fail clean_local_only_branch "out=$CLEAN_OUT"
 }
 test_clean_fresh_active_ignored() {
   ! grep -q 'fresh' <<<"$CLEAN_OUT" && pass clean_fresh_active_ignored || fail clean_fresh_active_ignored "out=$CLEAN_OUT"
@@ -319,8 +327,16 @@ test_clean_order() {
   [ "$(cut -f1 <<<"$CLEAN_OUT" | uniq | tr '\n' ' ')" = "harvested stale " ] && pass clean_order || fail clean_order "out=$CLEAN_OUT"
 }
 test_clean_no_origin() {
-  local err; err="$(cd "$N" && pg clean 2>&1 >/dev/null)"; local rc=$?
-  [ $rc -eq 1 ] && [[ "$err" == *"no 'origin' remote"* ]] && pass clean_no_origin || fail clean_no_origin "rc=$rc err=$err"
+  # Without a remote, clean compares local pg/* branches against local main.
+  local r="$tmp/clean-local"; mkpg "$r"
+  local out; out="$(cd "$r" && git add -A && gitc commit -qm init \
+    && git switch -q -c pg/2026-10-01-lh && pg new --tech lh --use-case u --kind bare --mode guided \
+         --durability throwaway --date 2026-10-01 >/dev/null && git add -A && gitc commit -qm lh \
+    && git switch -q main && git checkout -q pg/2026-10-01-lh -- pg/2026-10-01-lh/playground.json \
+    && jset pg/2026-10-01-lh/playground.json "d.update(status='concluded', concluded='2026-10-02', verdict='reject')" \
+    && git add -A && gitc commit -qm harvest && pg clean 2>&1)"; local rc=$?
+  [ $rc -eq 0 ] && grep -qxP 'harvested\tpg/2026-10-01-lh\tlocal' <<<"$out" \
+    && pass clean_no_origin || fail clean_no_origin "rc=$rc out=$out"
 }
 test_clean_missing_base() {
   local err; err="$(cd "$C" && pg clean --base origin/nope 2>&1 >/dev/null)"; local rc=$?
@@ -330,6 +346,7 @@ test_clean_missing_base() {
 test_clean_harvested
 test_clean_findings_branch
 test_clean_stale
+test_clean_local_only_branch
 test_clean_fresh_active_ignored
 test_clean_order
 test_clean_no_origin
@@ -399,41 +416,39 @@ FS="$tmp/flow-seed"; git clone -q "$FR" "$FS" 2>/dev/null
   && mkdir -p pg/2026-11-02-tw/experiments/01-a && echo r > pg/2026-11-02-tw/experiments/01-a/RESULT.md \
   && echo code > pg/2026-11-02-tw/experiments/01-a/main.py \
   && jset pg/2026-11-02-tw/playground.json "d.update(status='concluded', concluded='2026-11-03', verdict='hold')" \
-  && git add -A && gitc commit -qm tw && git push -q origin pg/2026-11-02-tw)
+  && git add -A && gitc commit -qm tw && git switch -q main)
 
 test_conclude_throwaway_flow() {
-  local w="$tmp/flow-conclude"; git clone -q "$FR" "$w" 2>/dev/null
-  # Mirrors workflow-new.md "Throwaway" conclude, run from the session's default checkout.
+  # Mirrors workflow-new.md "Throwaway" conclude, in the local checkout; the code branch was never pushed.
   # (&& chains, not set -e: set -e is ignored inside "( ... ) || ...")
-  (cd "$w" && git fetch -q origin \
-    && files=$(pg findings-files 2026-11-02-tw --ref origin/pg/2026-11-02-tw) && [ -n "$files" ] \
+  (cd "$FS" && git fetch -q origin \
+    && files=$(pg findings-files 2026-11-02-tw --ref pg/2026-11-02-tw) && [ -n "$files" ] \
     && git switch -q -c pg/2026-11-02-tw-findings origin/main \
-    && git checkout origin/pg/2026-11-02-tw -- $files \
+    && git checkout pg/2026-11-02-tw -- $files \
     && pg index >/dev/null \
-    && git add -A && gitc commit -qm findings && git push -q -u origin pg/2026-11-02-tw-findings
+    && git add -A && gitc commit -qm findings && git push -q -u origin pg/2026-11-02-tw-findings \
+    && git switch -q main
   ) 2>/dev/null || { fail conclude_throwaway_flow "sequence failed"; return; }
-  local tree; tree="$(git -C "$w" ls-tree -r --name-only origin/pg/2026-11-02-tw-findings)"
+  local tree; tree="$(git -C "$FS" ls-tree -r --name-only origin/pg/2026-11-02-tw-findings)"
   grep -qx pg/2026-11-02-tw/experiments/01-a/RESULT.md <<<"$tree" && grep -qx pg/2026-11-02-tw/FINDINGS.md <<<"$tree" \
     && ! grep -q main.py <<<"$tree" && ! grep -q pyproject.toml <<<"$tree" \
-    && git -C "$w" show origin/pg/2026-11-02-tw-findings:INDEX.md | grep -q 2026-11-02-tw \
+    && git -C "$FS" show origin/pg/2026-11-02-tw-findings:INDEX.md | grep -q 2026-11-02-tw \
     && pass conclude_throwaway_flow || fail conclude_throwaway_flow "tree: $(echo $tree)"
 }
 
 test_promote_flow() {
-  # Findings PR merged into main first.
-  git -C "$FS" fetch -q origin
+  # The findings PR is merged into main first.
   git -C "$FS" push -q origin origin/pg/2026-11-02-tw-findings:main || { fail promote_flow "no findings branch to merge"; return; }
-  local w="$tmp/flow-promote"; git clone -q "$FR" "$w" 2>/dev/null
   # Mirrors SKILL.md "promote".
-  (cd "$w" && git fetch -q origin \
+  (cd "$FS" && git fetch -q origin \
     && git switch -q pg/2026-11-02-tw \
     && gitc merge -q -X ours --no-edit origin/main \
     && jset pg/2026-11-02-tw/playground.json "d['durability']='durable'" \
     && pg validate 2026-11-02-tw >/dev/null && pg index >/dev/null \
-    && git add -A && gitc commit -qm promote && git push -q origin pg/2026-11-02-tw
+    && git add -A && gitc commit -qm promote && git push -q -u origin pg/2026-11-02-tw
   ) 2>/dev/null || { fail promote_flow "sequence failed"; return; }
   # The PR (pg/<slug> → main) must merge cleanly and carry the code.
-  git -C "$w" switch -q main && git -C "$w" pull -q 2>/dev/null
+  local w="$tmp/flow-promote"; git clone -q "$FR" "$w" 2>/dev/null
   gitc -C "$w" merge -q --no-edit origin/pg/2026-11-02-tw 2>/dev/null || { fail promote_flow "PR would conflict"; return; }
   [ -f "$w/pg/2026-11-02-tw/experiments/01-a/main.py" ] \
     && [ "$(jget "$w/pg/2026-11-02-tw/playground.json" "d['durability']")" = durable ] \

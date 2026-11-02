@@ -13,7 +13,7 @@ linked.
 
 Success looks like this:
 
-- From an empty cloud session to a scaffolded, committed playground with a
+- From a local clone of the playgrounds repo to a scaffolded, committed playground with a
   first runnable experiment, in one command plus a short interview.
 - Every concluded playground has an answered question list, a rubric score
   and a verdict that can be compared with other playgrounds.
@@ -21,10 +21,10 @@ Success looks like this:
 
 ## Constraints
 
-- **Runs mostly in Claude Code cloud sessions.** Containers are ephemeral
-  and sessions are bound to repos attached at start. A session cannot
-  create GitHub repos or delete remote branches. Anything worth keeping
-  must be committed and pushed.
+- **Runs locally** (Claude Code on the user's machine, in their clone of the
+  playgrounds repo), with `git` and `gh` available. Branches can stay
+  local-only, and Claude may delete branches after the user confirms.
+  (Changed from the original cloud-session assumption, per PR #11 review.)
 - **Tech scope for templates:** Python libraries, JS/TS libraries and
   frameworks, tools/services/infra. Anything else uses a bare template and
   Claude improvises.
@@ -41,9 +41,12 @@ Success looks like this:
 | Autonomy | Chosen at creation: guided (pair) or autopilot |
 | Lifecycle v1 | new, resume, index, compare, promote, clean, plus init |
 
-Alternatives that were rejected: a real repo per playground (needs a token
-secret plus `add_repo` on each creation, which is too much friction in cloud
-sessions) and a hybrid of the two storage models (two code paths).
+Alternatives that were rejected: a real repo per playground (repo
+creation, cloning and a cross-repo index for every spike is more friction
+than a directory plus a branch) and a hybrid of the two storage models (two
+code paths). The single repo was first chosen because of cloud-session
+limits; it was kept when the skill moved to running locally, because it
+still has the least friction and the index comes free.
 
 ## Components
 
@@ -82,7 +85,7 @@ writing and running experiments, scoring, and the verdict.
 | `pg.py new --tech T --use-case U --kind K --mode M --durability D` | Creates `pg/<yyyy-mm-dd>-<slug>/` from template `K`, writes `playground.json` and `FINDINGS.md`; prints the slug |
 | `pg.py index` | Rebuilds `INDEX.md` from every `pg/*/playground.json` in the working tree |
 | `pg.py findings-files <slug> [--ref R]` | Prints the paths that a throwaway merges to `main`; `--ref` reads them from a git ref instead of the working tree |
-| `pg.py clean` | Lists `pg/*` remote branches whose playground is concluded on `main`, and active playgrounds with no commit for 30 days |
+| `pg.py clean [--base R] [--days N]` | Lists local and `origin` `pg/*` branches whose playground is concluded or abandoned on the base (`origin/main`, or `main` without a remote), and active playgrounds with no commit for 30 days; each line says where the branch lives (`local`/`remote`/`both`) |
 | `pg.py validate [<slug>]` | Checks `playground.json` against the schema |
 
 Errors: exit non-zero with a single plain-language line on stderr (slug
@@ -251,9 +254,9 @@ gone, refuse and explain why.
 
 Run `pg.py clean` and present two lists: branches that are safe to delete
 (their findings are on `main`), and stale active playgrounds (offer to
-conclude or abandon each one). The session can't delete remote branches,
-so print the `git push origin --delete …` commands for the user to run, or
-point them to GitHub's branch page.
+conclude or abandon each one). Each branch is reported as `local`, `remote`
+or `both`. After the user confirms, delete it with `git branch -D` and/or
+`git push origin --delete`.
 
 ## Testing
 
@@ -271,8 +274,9 @@ creates temporary git repos (a bare "remote" plus a clone) and checks:
 - errors outside an initialized repo
 
 An end-to-end smoke test runs `init` → `new` → edit metadata → `index`. The
-skill's prose flows are checked by hand in a real cloud session on the
-playgrounds repo.
+throwaway-conclude and promote git sequences from the skill's prose are run
+as tests against a bare remote. The rest of the prose is checked by hand in a
+local clone of a real playgrounds repo.
 
 ## Out of scope for v1
 
