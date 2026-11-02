@@ -389,5 +389,66 @@ d['questions'][0].update(answer='yes', confidence='high', experiment='01-x')"
 }
 test_e2e
 
+# ---------- Final review fixes: the git flows in workflow-new.md / SKILL.md ----------
+# A fresh clone (as in a new cloud session) of a remote that has a concluded throwaway on pg/<slug>.
+FR="$tmp/flow.git"; git init -q --bare -b main "$FR"
+FS="$tmp/flow-seed"; git clone -q "$FR" "$FS" 2>/dev/null
+(cd "$FS" && pg init >/dev/null && git add -A && gitc commit -qm init && git push -q origin main \
+  && git switch -q -c pg/2026-11-02-tw && pg new --tech tw --use-case u --kind python --mode guided \
+       --durability throwaway --date 2026-11-02 --question q >/dev/null \
+  && mkdir -p pg/2026-11-02-tw/experiments/01-a && echo r > pg/2026-11-02-tw/experiments/01-a/RESULT.md \
+  && echo code > pg/2026-11-02-tw/experiments/01-a/main.py \
+  && jset pg/2026-11-02-tw/playground.json "d.update(status='concluded', concluded='2026-11-03', verdict='hold')" \
+  && git add -A && gitc commit -qm tw && git push -q origin pg/2026-11-02-tw)
+
+test_conclude_throwaway_flow() {
+  local w="$tmp/flow-conclude"; git clone -q "$FR" "$w" 2>/dev/null
+  # Mirrors workflow-new.md "Throwaway" conclude, run from the session's default checkout.
+  # (&& chains, not set -e: set -e is ignored inside "( ... ) || ...")
+  (cd "$w" && git fetch -q origin \
+    && files=$(pg findings-files 2026-11-02-tw --ref origin/pg/2026-11-02-tw) && [ -n "$files" ] \
+    && git switch -q -c pg/2026-11-02-tw-findings origin/main \
+    && git checkout origin/pg/2026-11-02-tw -- $files \
+    && pg index >/dev/null \
+    && git add -A && gitc commit -qm findings && git push -q -u origin pg/2026-11-02-tw-findings
+  ) 2>/dev/null || { fail conclude_throwaway_flow "sequence failed"; return; }
+  local tree; tree="$(git -C "$w" ls-tree -r --name-only origin/pg/2026-11-02-tw-findings)"
+  grep -qx pg/2026-11-02-tw/experiments/01-a/RESULT.md <<<"$tree" && grep -qx pg/2026-11-02-tw/FINDINGS.md <<<"$tree" \
+    && ! grep -q main.py <<<"$tree" && ! grep -q pyproject.toml <<<"$tree" \
+    && git -C "$w" show origin/pg/2026-11-02-tw-findings:INDEX.md | grep -q 2026-11-02-tw \
+    && pass conclude_throwaway_flow || fail conclude_throwaway_flow "tree: $(echo $tree)"
+}
+
+test_promote_flow() {
+  # Findings PR merged into main first.
+  git -C "$FS" fetch -q origin
+  git -C "$FS" push -q origin origin/pg/2026-11-02-tw-findings:main || { fail promote_flow "no findings branch to merge"; return; }
+  local w="$tmp/flow-promote"; git clone -q "$FR" "$w" 2>/dev/null
+  # Mirrors SKILL.md "promote".
+  (cd "$w" && git fetch -q origin \
+    && git switch -q pg/2026-11-02-tw \
+    && gitc merge -q -X ours --no-edit origin/main \
+    && jset pg/2026-11-02-tw/playground.json "d['durability']='durable'" \
+    && pg validate 2026-11-02-tw >/dev/null && pg index >/dev/null \
+    && git add -A && gitc commit -qm promote && git push -q origin pg/2026-11-02-tw
+  ) 2>/dev/null || { fail promote_flow "sequence failed"; return; }
+  # The PR (pg/<slug> → main) must merge cleanly and carry the code.
+  git -C "$w" switch -q main && git -C "$w" pull -q 2>/dev/null
+  gitc -C "$w" merge -q --no-edit origin/pg/2026-11-02-tw 2>/dev/null || { fail promote_flow "PR would conflict"; return; }
+  [ -f "$w/pg/2026-11-02-tw/experiments/01-a/main.py" ] \
+    && [ "$(jget "$w/pg/2026-11-02-tw/playground.json" "d['durability']")" = durable ] \
+    && pass promote_flow || fail promote_flow "code or durability missing after merge"
+}
+
+test_findings_files_ref_unknown() {
+  local err; err="$(cd "$FS" && pg findings-files 2026-11-02-tw --ref origin/nope 2>&1 >/dev/null)"; local rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == *"no playground 2026-11-02-tw at origin/nope"* ]] \
+    && pass findings_files_ref_unknown || fail findings_files_ref_unknown "rc=$rc err=$err"
+}
+
+test_conclude_throwaway_flow
+test_promote_flow
+test_findings_files_ref_unknown
+
 [ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
 exit $fails

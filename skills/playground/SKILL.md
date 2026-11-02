@@ -24,7 +24,7 @@ PG="python3 <this skill's base directory>/scripts/pg.py"
 | `$PG new --tech T --use-case U --kind python\|ts\|infra\|bare --mode guided\|autopilot --durability durable\|throwaway [--question Q]... [--name N]` | Scaffolds `pg/<slug>/`, prints the slug |
 | `$PG validate [<slug>]` | Checks `playground.json`; run before every commit |
 | `$PG index` | Regenerates `INDEX.md` |
-| `$PG findings-files <slug>` | Paths a throwaway merges to `main` |
+| `$PG findings-files <slug> [--ref <git-ref>]` | Paths a throwaway merges to `main` (`--ref` reads from a branch, not the working tree) |
 | `$PG clean` | `harvested\t<branch>` / `stale\t<branch>\t<days>` lines |
 
 Errors are one `pg: ...` line with exit 1. If one says `not a playgrounds
@@ -39,8 +39,16 @@ The first word of the arguments picks the command: `init`, `resume`,
 
 ## Commands
 
-**init**: Run `$PG init`, commit, push, and open a draft PR so the user can
-merge the setup into `main`.
+**init**: Everything here assumes the repo's default branch is `main`.
+Run `git ls-remote --heads origin`.
+- **Origin has a `main`:** run `$PG init` on a branch from it, commit, push,
+  and open a draft PR into `main`.
+- **Origin has no branches (a brand-new empty repo):** `git switch -c main`,
+  run `$PG init`, commit, and `git push -u origin main`. That makes `main`
+  the default branch.
+- **Pushing `main` is refused**, or the default branch has another name:
+  ask the user to create `main` themselves. The easiest way is to recreate
+  the repo with "Add a README" ticked. Then take the PR route.
 
 **new**: Follow `references/workflow-new.md` exactly: interview → scaffold →
 research → experiments → conclude.
@@ -64,9 +72,17 @@ and to add the other slugs to each playground's `compared_with` (validate,
 commit, open a draft PR).
 
 **promote `<slug>`**: Only for a concluded throwaway whose `pg/<slug>` branch
-still exists on origin; otherwise refuse and explain. On the branch, set
-`durability: durable`, validate, commit, and open a draft PR from `pg/<slug>`
-to `main`.
+still exists on origin; otherwise refuse and explain. Its findings are
+usually already on `main`, so merge `main` in first, keeping the branch's
+versions of the files both sides added:
+
+```sh
+git fetch origin && git switch pg/<slug>
+git merge -X ours --no-edit origin/main
+```
+
+Then set `durability: durable`, run `$PG validate <slug>` and `$PG index`,
+commit, push, and open a draft PR from `pg/<slug>` to `main`.
 
 **clean**: `git fetch origin --prune`, then `$PG clean`. Present:
 - **Safe to delete** (findings already on `main`): print one

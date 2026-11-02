@@ -105,9 +105,9 @@ Ecosystem, Ops cost, License) and records a verdict: adopt, trial, hold
 or reject. You choose **guided** (you drive, Claude pairs) or **autopilot**
 (Claude runs everything and drafts the verdict).
 
-**One-time setup:** create an empty GitHub repo (e.g. `playgrounds`), start
-a Claude Code session on it, run `/playground init`, and merge the PR it
-opens.
+**One-time setup:** create a GitHub repo (e.g. `playgrounds`) with "Add a
+README" ticked, so it starts with a `main` branch. Start a Claude Code
+session on it, run `/playground init`, and merge the PR it opens.
 
 | Command | |
 |---|---|

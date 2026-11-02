@@ -81,7 +81,7 @@ writing and running experiments, scoring, and the verdict.
 | `pg.py init` | Writes `README.md`, `INDEX.md`, `.gitignore`, and `.playgrounds` marker into the repo root; no-op if present |
 | `pg.py new --tech T --use-case U --kind K --mode M --durability D` | Creates `pg/<yyyy-mm-dd>-<slug>/` from template `K`, writes `playground.json` and `FINDINGS.md`; prints the slug |
 | `pg.py index` | Rebuilds `INDEX.md` from every `pg/*/playground.json` in the working tree |
-| `pg.py findings-files <slug>` | Prints the paths that a throwaway merges to `main` |
+| `pg.py findings-files <slug> [--ref R]` | Prints the paths that a throwaway merges to `main`; `--ref` reads them from a git ref instead of the working tree |
 | `pg.py clean` | Lists `pg/*` remote branches whose playground is concluded on `main`, and active playgrounds with no commit for 30 days |
 | `pg.py validate [<slug>]` | Checks `playground.json` against the schema |
 
@@ -177,8 +177,10 @@ If it doesn't, they stop and suggest `/playground init`.
 
 ### init
 
-Run in a session attached to an empty repo: `pg.py init`, then commit and
-push on the session branch.
+The repo's default branch must be `main`. If origin has no branches, create
+`main`, run `pg.py init`, commit, and push `main`. Otherwise run `init` on a
+branch and open a PR into `main`. If pushing `main` is refused, ask the user
+to create the repo with a README.
 
 ### new: `/playground <tech> for <use case>`
 
@@ -212,7 +214,7 @@ the user confirms the verdict.
 3. Open a draft PR to `main`:
    - **Durable:** the whole branch.
    - **Throwaway:** a new branch `pg/<slug>-findings` from `main` containing
-     only the `pg.py findings-files` paths (`playground.json`,
+     only the `pg.py findings-files --ref origin/pg/<slug>` paths (`playground.json`,
      `FINDINGS.md`, `README.md`, `experiments/*/RESULT.md`) plus `INDEX.md`.
      The code stays on `pg/<slug>`.
 
@@ -239,8 +241,10 @@ the slugs to each playground's `compared_with`.
 
 ### promote `<slug>`
 
-For a concluded throwaway whose `pg/<slug>` branch still exists: set
-`durability: durable` and open a PR that merges the code. If the branch is
+For a concluded throwaway whose `pg/<slug>` branch still exists: merge
+`origin/main` into it with `-X ours` (the findings PR already added the same
+files), set `durability: durable`, re-index, and open a PR that merges the
+code. If the branch is
 gone, refuse and explain why.
 
 ### clean
