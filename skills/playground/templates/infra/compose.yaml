@@ -1,0 +1,9 @@
+name: pg-{{slug}}
+
+services: {}
+# Example:
+#   postgres:
+#     image: postgres:17
+#     environment:
+#       POSTGRES_PASSWORD: pg
+#     ports: ["5432:5432"]

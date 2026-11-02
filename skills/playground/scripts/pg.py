@@ -11,8 +11,10 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -205,6 +207,86 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 1 if bad else 0
 
 
+PLACEHOLDER = re.compile(r"\{\{(slug|tech|use_case|created|questions)\}\}")
+
+
+def slugify(text: str) -> str:
+    text = text.replace("+", "plus").replace("#", "sharp")
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    text = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return text[:40].rstrip("-")
+
+
+def render(text: str, values: dict) -> str:
+    # One pass, so a value that itself contains "{{slug}}" is left alone.
+    return PLACEHOLDER.sub(lambda m: values[m.group(1)], text)
+
+
+def render_questions(questions: list[dict]) -> str:
+    if not questions:
+        return "_No questions yet._"
+    blocks = [
+        f"### {q['id']}: {q['text']}\n- Answer: _pending_\n- Confidence:\n- Evidence:"
+        for q in questions
+    ]
+    return "\n\n".join(blocks)
+
+
+def cmd_new(args: argparse.Namespace) -> int:
+    root = repo_root()
+    require_playgrounds(root)
+    if args.kind not in KINDS:
+        raise PgError(f"unknown kind '{args.kind}' ({'|'.join(KINDS)})")
+    base_text = args.name if args.name else args.tech
+    base = slugify(base_text)
+    if not base:
+        raise PgError(f"cannot derive a slug from '{base_text}'; pass --name")
+    created = args.date or dt.date.today().isoformat()
+    if not is_date(created):
+        raise PgError(f"--date must be YYYY-MM-DD, got '{created}'")
+    slug = f"{created}-{base}"
+    dest = root / "pg" / slug
+    if dest.exists():
+        raise PgError(f"playground {slug} already exists; pass --name")
+
+    questions = [
+        {"id": f"Q{i}", "text": t, "answer": None, "confidence": None, "experiment": None}
+        for i, t in enumerate(args.question or [], start=1)
+    ]
+    meta = {
+        "slug": slug, "tech": args.tech, "version": None, "kind": args.kind,
+        "use_case": args.use_case, "mode": args.mode, "durability": args.durability,
+        "status": "active", "created": created, "concluded": None,
+        "questions": questions,
+        "rubric": {**{k: None for k in RUBRIC_SCORES}, "license": None},
+        "verdict": None, "verdict_draft": False, "compared_with": [],
+    }
+    errs = validate_meta(meta, slug)
+    if errs:
+        raise PgError("; ".join(errs))
+
+    values = {
+        "slug": slug, "tech": args.tech, "use_case": args.use_case,
+        "created": created, "questions": render_questions(questions),
+    }
+    dest.mkdir(parents=True)
+    src = TEMPLATES / args.kind
+    for f in sorted(src.rglob("*")):
+        if f.is_dir():
+            continue
+        out = dest / f.relative_to(src)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(render(f.read_text(), values))
+        out.chmod(f.stat().st_mode & 0o777)
+    (dest / "experiments").mkdir(exist_ok=True)
+    (dest / "experiments" / ".gitkeep").touch()
+    findings = (SKILL_DIR / "references" / "findings-template.md").read_text()
+    (dest / "FINDINGS.md").write_text(render(findings, values))
+    (dest / "playground.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n")
+    print(slug)
+    return 0
+
+
 def cmd_index(args: argparse.Namespace) -> int:
     root = repo_root()
     require_playgrounds(root)
@@ -216,6 +298,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="set up a playgrounds repo").set_defaults(func=cmd_init)
     sub.add_parser("index", help="rebuild INDEX.md").set_defaults(func=cmd_index)
+    n = sub.add_parser("new", help="scaffold a playground; prints its slug")
+    n.add_argument("--tech", required=True)
+    n.add_argument("--use-case", required=True)
+    n.add_argument("--kind", required=True, help="|".join(KINDS))
+    n.add_argument("--mode", required=True, choices=["guided", "autopilot"])
+    n.add_argument("--durability", required=True, choices=["durable", "throwaway"])
+    n.add_argument("--question", action="append", help="repeat for each question")
+    n.add_argument("--name", help="slug text to use instead of --tech")
+    n.add_argument("--date", help="YYYY-MM-DD (default: today)")
+    n.set_defaults(func=cmd_new)
     v = sub.add_parser("validate", help="check playground.json files")
     v.add_argument("slug", nargs="?")
     v.set_defaults(func=cmd_validate)

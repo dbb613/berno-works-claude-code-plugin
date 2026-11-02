@@ -120,5 +120,83 @@ test_validate_slug_mismatch() {
 }
 test_validate_slug_mismatch
 
+# ---------- Task 3: new ----------
+N="$tmp/new"; mkpg "$N"
+newpg() { (cd "$N" && pg new --mode guided --durability throwaway --date 2026-11-02 "$@"); }
+
+test_new_python() {
+  local slug; slug="$(newpg --tech httpx --use-case "async client" --kind python --question "Q a" --question "Q b")" \
+    || { fail new_python "exit $?"; return; }
+  [ "$slug" = "2026-11-02-httpx" ] || { fail new_python "slug=$slug"; return; }
+  local d="$N/pg/$slug"
+  for f in pyproject.toml FINDINGS.md README.md experiments/.gitkeep playground.json; do
+    [ -f "$d/$f" ] || { fail new_python "missing $f"; return; }
+  done
+  (cd "$N" && pg validate "$slug" >/dev/null) || { fail new_python "does not validate"; return; }
+  [ "$(jget "$d/playground.json" "[q['id'] for q in d['questions']]")" = "['Q1', 'Q2']" ] || { fail new_python "question ids"; return; }
+  grep -q '^### Q2: Q b$' "$d/FINDINGS.md" || { fail new_python "FINDINGS question heading"; return; }
+  grep -q 'pg-2026-11-02-httpx' "$d/pyproject.toml" || { fail new_python "pyproject name"; return; }
+  ! grep -q '{{' "$d/FINDINGS.md" "$d/README.md" "$d/pyproject.toml" || { fail new_python "unrendered placeholder"; return; }
+  pass new_python
+}
+
+test_new_each_kind() {
+  local k slug
+  for k in ts infra bare; do
+    slug="$(newpg --tech "kind $k" --use-case u --kind "$k")" || { fail new_each_kind "$k exit"; return; }
+    (cd "$N" && pg validate "$slug" >/dev/null) || { fail new_each_kind "$k does not validate"; return; }
+  done
+  python3 -m json.tool "$N/pg/2026-11-02-kind-ts/package.json" >/dev/null || { fail new_each_kind "package.json invalid"; return; }
+  [ -x "$N/pg/2026-11-02-kind-infra/run.sh" ] || { fail new_each_kind "run.sh not executable"; return; }
+  pass new_each_kind
+}
+
+test_slugify_cases() {
+  local out; out="$(python3 -c "
+import sys; sys.path.insert(0, sys.argv[1]); import pg
+for t in ['Next.js 15', 'C++', '@tanstack/query', 'Ünïcode', 'C#', '  --Hello  World--  ', 'x'*60]:
+    print(pg.slugify(t))" "$scripts")"
+  local want; want="$(printf '%s\n' next-js-15 cplusplus tanstack-query unicode csharp hello-world "$(printf 'x%.0s' {1..40})")"
+  [ "$out" = "$want" ] && pass slugify_cases || fail slugify_cases "got: $(echo $out)"
+}
+
+test_slug_empty_errors() {
+  local err; err="$(newpg --tech '+++' --name '!!!' --use-case u --kind bare 2>&1 >/dev/null)"; local rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == *"pass --name"* ]] && pass slug_empty_errors || fail slug_empty_errors "rc=$rc err=$err"
+}
+
+test_new_duplicate() {
+  newpg --tech dup --use-case u --kind bare >/dev/null
+  local err; err="$(newpg --tech dup --use-case u --kind bare 2>&1 >/dev/null)"; local rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == *"already exists"* ]] && pass new_duplicate || fail new_duplicate "rc=$rc err=$err"
+}
+
+test_new_bad_kind() {
+  local err; err="$(newpg --tech k --use-case u --kind rust 2>&1 >/dev/null)"; local rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == *"unknown kind 'rust'"* ]] && pass new_bad_kind || fail new_bad_kind "rc=$rc err=$err"
+}
+
+test_use_case_special_chars() {
+  local uc; uc=$'say "hi" | then\nbye {{slug}}'
+  local slug; slug="$(newpg --tech special --use-case "$uc" --kind ts)" || { fail use_case_special_chars "exit"; return; }
+  python3 -m json.tool "$N/pg/$slug/package.json" >/dev/null || { fail use_case_special_chars "package.json invalid"; return; }
+  local got; got="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['use_case'] == sys.argv[2])" "$N/pg/$slug/playground.json" "$uc")"
+  [ "$got" = "True" ] && pass use_case_special_chars || fail use_case_special_chars "use_case did not round-trip"
+}
+
+test_templates_no_freetext_in_code() {
+  local hits; hits="$(grep -rlE '\{\{(tech|use_case|questions)\}\}' "$root/skills/playground/templates" | grep -v '\.md$')"
+  [ -z "$hits" ] && pass templates_no_freetext_in_code || fail templates_no_freetext_in_code "$hits"
+}
+
+test_new_python
+test_new_each_kind
+test_slugify_cases
+test_slug_empty_errors
+test_new_duplicate
+test_new_bad_kind
+test_use_case_special_chars
+test_templates_no_freetext_in_code
+
 [ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
 exit $fails
