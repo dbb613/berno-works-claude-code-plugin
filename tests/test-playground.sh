@@ -4,6 +4,8 @@ set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"
 scripts="$root/skills/playground/scripts"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+# Hermetic git: ignore the caller's global/system config.
+: > "$tmp/gitconfig"; export GIT_CONFIG_GLOBAL="$tmp/gitconfig" GIT_CONFIG_NOSYSTEM=1
 fails=0
 pass() { echo "PASS $1"; }
 fail() { echo "FAIL $1: $2"; fails=$((fails + 1)); }
@@ -275,6 +277,63 @@ test_index_skips_invalid
 test_index_empty
 test_findings_files
 test_findings_files_unknown
+
+# ---------- Task 5: clean ----------
+CR="$tmp/remote.git"; C="$tmp/clone"
+git init -q --bare -b main "$CR"
+git clone -q "$CR" "$C" 2>/dev/null
+(cd "$C" && pg init >/dev/null && git add -A && gitc commit -qm init && git push -q origin main)
+# branch_pg <branch> <tech> [git env...]: playground committed on its own branch, pushed
+branch_pg() {
+  local br="$1" tech="$2"; shift 2
+  (cd "$C" && git switch -q -c "$br" main \
+    && pg new --tech "$tech" --use-case u --kind bare --mode guided --durability throwaway --date 2026-10-01 >/dev/null \
+    && git add -A && env "$@" git -c user.email=t@t -c user.name=t commit -qm "$br" \
+    && git push -q origin "$br" && git switch -q main)
+}
+branch_pg pg/2026-10-01-harv harv
+branch_pg pg/2026-10-01-old old GIT_COMMITTER_DATE=2020-01-01T00:00:00
+branch_pg pg/2026-10-01-fresh fresh
+# Harvest "harv": its concluded findings land on main, plus a -findings branch.
+(cd "$C" && git checkout -q pg/2026-10-01-harv -- pg/2026-10-01-harv/playground.json \
+  && jset pg/2026-10-01-harv/playground.json "d.update(status='concluded', concluded='2026-10-02', verdict='hold')" \
+  && git add -A && gitc commit -qm harvest && git push -q origin main \
+  && git push -q origin main:pg/2026-10-01-harv-findings && git fetch -q origin)
+CLEAN_OUT="$(cd "$C" && pg clean 2>&1)"; CLEAN_RC=$?
+
+test_clean_harvested() {
+  [ $CLEAN_RC -eq 0 ] && grep -qxP 'harvested\tpg/2026-10-01-harv' <<<"$CLEAN_OUT" \
+    && pass clean_harvested || fail clean_harvested "rc=$CLEAN_RC out=$CLEAN_OUT"
+}
+test_clean_findings_branch() {
+  grep -qxP 'harvested\tpg/2026-10-01-harv-findings' <<<"$CLEAN_OUT" \
+    && pass clean_findings_branch || fail clean_findings_branch "out=$CLEAN_OUT"
+}
+test_clean_stale() {
+  grep -qP '^stale\tpg/2026-10-01-old\t[0-9]+$' <<<"$CLEAN_OUT" && pass clean_stale || fail clean_stale "out=$CLEAN_OUT"
+}
+test_clean_fresh_active_ignored() {
+  ! grep -q 'fresh' <<<"$CLEAN_OUT" && pass clean_fresh_active_ignored || fail clean_fresh_active_ignored "out=$CLEAN_OUT"
+}
+test_clean_order() {
+  [ "$(cut -f1 <<<"$CLEAN_OUT" | uniq | tr '\n' ' ')" = "harvested stale " ] && pass clean_order || fail clean_order "out=$CLEAN_OUT"
+}
+test_clean_no_origin() {
+  local err; err="$(cd "$N" && pg clean 2>&1 >/dev/null)"; local rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == *"no 'origin' remote"* ]] && pass clean_no_origin || fail clean_no_origin "rc=$rc err=$err"
+}
+test_clean_missing_base() {
+  local err; err="$(cd "$C" && pg clean --base origin/nope 2>&1 >/dev/null)"; local rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == *"base ref 'origin/nope' not found"* ]] && pass clean_missing_base || fail clean_missing_base "rc=$rc err=$err"
+}
+
+test_clean_harvested
+test_clean_findings_branch
+test_clean_stale
+test_clean_fresh_active_ignored
+test_clean_order
+test_clean_no_origin
+test_clean_missing_base
 
 [ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
 exit $fails
