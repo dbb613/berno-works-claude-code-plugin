@@ -105,9 +105,14 @@ Ecosystem, Ops cost, License) and records a verdict: adopt, trial, hold
 or reject. You choose **guided** (you drive, Claude pairs) or **autopilot**
 (Claude runs everything and drafts the verdict).
 
-**One-time setup:** create a GitHub repo (e.g. `playgrounds`) with "Add a
-README" ticked, so it starts with a `main` branch. Start a Claude Code
-session on it, run `/playground init`, and merge the PR it opens.
+It runs locally, in your clone of a dedicated playgrounds repo.
+
+**One-time setup:**
+
+```sh
+gh repo create playgrounds --private --add-readme --clone && cd playgrounds
+claude    # then: /playground init
+```
 
 | Command | |
 |---|---|
@@ -124,8 +129,9 @@ If another plugin also has a `playground` skill, use
 **Durable** playgrounds merge code and findings into `main`.
 **Throwaway** playgrounds merge only their findings (`FINDINGS.md`,
 `playground.json`, each experiment's `RESULT.md`). Their code stays on
-the branch until you delete it. Cloud sessions can't delete branches, so
-`clean` prints the `git push origin --delete` commands for you.
+the branch until you delete it, and that branch can stay local-only.
+`clean` finds branches whose findings are already on `main`, plus stale
+playgrounds, and deletes the ones you confirm (local and on GitHub).
 
 Mechanical steps run through `skills/playground/scripts/pg.py`, which needs
 only `python3` 3.9 or later. Tests: `bash tests/test-playground.sh`.
