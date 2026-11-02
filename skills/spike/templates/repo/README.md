@@ -8,20 +8,20 @@ ends in a verdict: adopt, trial, hold or reject.
 `INDEX.md` lists every playground. It is generated, so don't edit it by
 hand.
 
-Managed by the `playground` skill in
+Managed by the `spike` skill (`/spike`) in
 [berno-works-plugin](https://github.com/dbb613/berno-works-claude-code-plugin).
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `/playground <tech> for <use case>` | Interview, scaffold a playground on branch `pg/<slug>`, run experiments |
-| `/playground resume <slug>` | Pick up where a playground left off |
-| `/playground index` | Rebuild and show `INDEX.md` |
-| `/playground compare <slug> <slug>…` | Side-by-side rubric and answers, with a recommendation |
-| `/playground promote <slug>` | Turn a concluded throwaway into a durable playground |
-| `/playground clean` | List branches that are safe to delete and playgrounds that have gone stale |
-| `/playground init` | Set up this repo (already done) |
+| `/spike <tech> for <use case>` | Interview, scaffold a playground on branch `pg/<slug>`, run experiments |
+| `/spike resume <slug>` | Pick up where a playground left off |
+| `/spike index` | Rebuild and show `INDEX.md` |
+| `/spike compare <slug> <slug>…` | Side-by-side rubric and answers, with a recommendation |
+| `/spike promote <slug>` | Turn a concluded throwaway into a durable playground |
+| `/spike clean` | List branches that are safe to delete and playgrounds that have gone stale |
+| `/spike init` | Set up this repo (already done) |
 
 **Durable** playgrounds merge code and findings into `main`.
 **Throwaway** playgrounds merge only their findings. Their code stays on

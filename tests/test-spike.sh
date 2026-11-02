@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Tests for skills/playground/scripts/pg.py. Run: bash tests/test-playground.sh
+# Tests for the spike skill (skills/spike/scripts/pg.py and its prose). Run: bash tests/test-spike.sh
 set -u
 root="$(cd "$(dirname "$0")/.." && pwd)"
-scripts="$root/skills/playground/scripts"
+scripts="$root/skills/spike/scripts"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 # Hermetic git: ignore the caller's global/system config.
 : > "$tmp/gitconfig"; export GIT_CONFIG_GLOBAL="$tmp/gitconfig" GIT_CONFIG_NOSYSTEM=1
@@ -44,7 +44,7 @@ test_init_idempotent() {
 test_requires_marker() {
   local r="$tmp/nomark"; mkrepo "$r"
   local err; err="$(cd "$r" && pg index 2>&1 >/dev/null)"; local rc=$?
-  [ $rc -eq 1 ] && [[ "$err" == *"pg: not a playgrounds repo"* ]] && pass requires_marker || fail requires_marker "rc=$rc err=$err"
+  [ $rc -eq 1 ] && [[ "$err" == *"pg: not a playgrounds repo"* && "$err" == *"/spike init"* ]] && pass requires_marker || fail requires_marker "rc=$rc err=$err"
 }
 
 test_not_git() {
@@ -187,7 +187,7 @@ test_use_case_special_chars() {
 }
 
 test_templates_no_freetext_in_code() {
-  local hits; hits="$(grep -rlE '\{\{(tech|use_case|questions)\}\}' "$root/skills/playground/templates" | grep -v '\.md$')"
+  local hits; hits="$(grep -rlE '\{\{(tech|use_case|questions)\}\}' "$root/skills/spike/templates" | grep -v '\.md$')"
   [ -z "$hits" ] && pass templates_no_freetext_in_code || fail templates_no_freetext_in_code "$hits"
 }
 
@@ -353,12 +353,12 @@ test_clean_no_origin
 test_clean_missing_base
 
 # ---------- Task 6: skill prose ----------
-SK="$root/skills/playground"
+SK="$root/skills/spike"
 test_skill_frontmatter() {
   local name desc
   name="$(sed -n 's/^name:[[:space:]]*//p' "$SK/SKILL.md" 2>/dev/null | head -1)"
   desc="$(sed -n 's/^description:[[:space:]]*//p' "$SK/SKILL.md" 2>/dev/null | head -1)"
-  [ "$name" = "playground" ] && [ -n "$desc" ] && pass skill_frontmatter || fail skill_frontmatter "name=$name"
+  [ "$name" = "spike" ] && [ -n "$desc" ] && pass skill_frontmatter || fail skill_frontmatter "name=$name"
 }
 test_skill_mentions_every_command() {
   local c missing=""
@@ -513,8 +513,8 @@ test_explicit_utf8() {  # 16
 }
 
 test_skill_uses_equals_form() {  # 17
-  local f="$root/skills/playground/references/workflow-new.md"
-  grep -q -- '--tech="<tech>" --use-case="<use case>"' "$f" && ! grep -qE -- '--(tech|use-case|question|name) "' "$f" "$root/skills/playground/SKILL.md" \
+  local f="$root/skills/spike/references/workflow-new.md"
+  grep -q -- '--tech="<tech>" --use-case="<use case>"' "$f" && ! grep -qE -- '--(tech|use-case|question|name) "' "$f" "$root/skills/spike/SKILL.md" \
     || { fail skill_uses_equals_form "workflow/SKILL examples still use the space form"; return; }
   local slug; slug="$(newm --tech=--dash --name=dash --use-case=-u)" && [ "$slug" = "2026-11-02-dash" ] \
     && pass skill_uses_equals_form || fail skill_uses_equals_form "--tech=--dash failed"
@@ -527,5 +527,12 @@ test_new_failure_cleans_up
 test_explicit_utf8
 test_skill_uses_equals_form
 
-[ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
+# ---------- Rename: /playground clashed with the official playground plugin ----------
+test_no_old_command_name() {
+  local hits; hits="$(grep -rnE '/playground([[:space:]`]|$)' "$root/skills/spike" "$root/README.md")"
+  [ -z "$hits" ] && pass no_old_command_name || fail no_old_command_name "$hits"
+}
+test_no_old_command_name
+
+[ $fails -eq 0 ] && echo "PASS spike" || echo "$fails failure(s)"
 exit $fails

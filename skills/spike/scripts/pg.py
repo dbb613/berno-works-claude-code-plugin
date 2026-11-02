@@ -43,7 +43,7 @@ def repo_root() -> Path:
 
 def require_playgrounds(root: Path) -> None:
     if not (root / MARKER).is_file():
-        raise PgError("not a playgrounds repo (no .playgrounds); run /playground init")
+        raise PgError("not a playgrounds repo (no .playgrounds); run /spike init")
 
 
 def write_new(path: Path, content: str) -> bool:
