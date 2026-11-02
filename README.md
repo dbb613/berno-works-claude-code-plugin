@@ -94,6 +94,42 @@ the source commit)
 - **Not set for you:** `skipDangerousModePermissionPrompt`. It turns off a
   safety prompt, so set it yourself in `~/.claude/settings.json` if you want it.
 
+## Playgrounds
+
+The `playground` skill turns "should we use X for Y?" into a spike that
+ends in a decision. You give it a tech and a use case. It interviews you
+for 2–5 concrete questions, scaffolds a self-contained project (Python,
+TS, infra via docker compose, or bare), then runs one experiment per
+question. It scores a fixed rubric (DX, Docs, Performance, Maturity,
+Ecosystem, Ops cost, License) and records a verdict: adopt, trial, hold
+or reject. You choose **guided** (you drive, Claude pairs) or **autopilot**
+(Claude runs everything and drafts the verdict).
+
+**One-time setup:** create an empty GitHub repo (e.g. `playgrounds`), start
+a Claude Code session on it, run `/playground init`, and merge the PR it
+opens.
+
+| Command | |
+|---|---|
+| `/playground <tech> for <use case>` | Start a playground on branch `pg/<slug>` |
+| `/playground resume <slug>` | Pick up where you left off |
+| `/playground index` | Every playground with its verdict and scores (`INDEX.md`) |
+| `/playground compare <slug> <slug>…` | Side-by-side, with a recommendation |
+| `/playground promote <slug>` | Make a throwaway durable |
+| `/playground clean` | Branches that are safe to delete, and stale playgrounds |
+
+If another plugin also has a `playground` skill, use
+`/berno-works-plugin:playground`.
+
+**Durable** playgrounds merge code and findings into `main`.
+**Throwaway** playgrounds merge only their findings (`FINDINGS.md`,
+`playground.json`, each experiment's `RESULT.md`). Their code stays on
+the branch until you delete it. Cloud sessions can't delete branches, so
+`clean` prints the `git push origin --delete` commands for you.
+
+Mechanical steps run through `skills/playground/scripts/pg.py`, which needs
+only `python3` 3.9 or later. Tests: `bash tests/test-playground.sh`.
+
 ## Customizing
 
 Edit [`hooks/preferences.md`](hooks/preferences.md) **in this repo** (not
