@@ -1,9 +1,9 @@
 ---
-name: playground
-description: Use when the user wants to spike, vet, evaluate or try out a language, library, framework, technique or tool for a use case, or runs /playground. Scaffolds a playground in the playgrounds repo, runs question-driven experiments, scores a standard rubric and records a verdict; also resumes, indexes, compares, promotes and cleans playgrounds.
+name: spike
+description: Use when the user wants to spike, vet, evaluate or try out a language, library, framework, technique or tool for a use case, or runs /spike. Scaffolds a playground in the playgrounds repo, runs question-driven experiments, scores a standard rubric and records a verdict; also resumes, indexes, compares, promotes and cleans playgrounds.
 ---
 
-# Playground
+# Spike
 
 A playground is a spike that answers one thing: **is this tech suitable for
 this use case?** It leaves behind runnable experiments *and* a findings record
@@ -30,7 +30,7 @@ PG="python3 <this skill's base directory>/scripts/pg.py"
 
 Errors are one `pg: ...` line with exit 1. If one says `not a playgrounds
 repo`, stop and tell the user to `cd` into their playgrounds clone, or set
-one up with `/playground init`.
+one up with `/spike init`.
 
 ## Routing
 

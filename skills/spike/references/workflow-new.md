@@ -108,7 +108,7 @@ When the user says they're done (guided) or confirms the draft (autopilot):
      run `git checkout pg/<slug> --` with an empty file list: that
      switches branches instead of copying files.
      Tell the user the code stays on the local `pg/<slug>` branch until
-     `/playground clean`, and that `/playground promote` can still bring it
+     `/spike clean`, and that `/spike promote` can still bring it
      in. If `pg/<slug>` exists only on origin, use `origin/pg/<slug>` in the
      two commands above.
 

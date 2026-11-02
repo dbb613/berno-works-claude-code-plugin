@@ -94,9 +94,9 @@ the source commit)
 - **Not set for you:** `skipDangerousModePermissionPrompt`. It turns off a
   safety prompt, so set it yourself in `~/.claude/settings.json` if you want it.
 
-## Playgrounds
+## Spikes (playgrounds)
 
-The `playground` skill turns "should we use X for Y?" into a spike that
+The `spike` skill (`/spike`) turns "should we use X for Y?" into a spike that
 ends in a decision. You give it a tech and a use case. It interviews you
 for 2–5 concrete questions, scaffolds a self-contained project (Python,
 TS, infra via docker compose, or bare), then runs one experiment per
@@ -111,20 +111,21 @@ It runs locally, in your clone of a dedicated playgrounds repo.
 
 ```sh
 gh repo create playgrounds --private --add-readme --clone && cd playgrounds
-claude    # then: /playground init
+claude    # then: /spike init
 ```
 
 | Command | |
 |---|---|
-| `/playground <tech> for <use case>` | Start a playground on branch `pg/<slug>` |
-| `/playground resume <slug>` | Pick up where you left off |
-| `/playground index` | Every playground with its verdict and scores (`INDEX.md`) |
-| `/playground compare <slug> <slug>…` | Side-by-side, with a recommendation |
-| `/playground promote <slug>` | Make a throwaway durable |
-| `/playground clean` | Branches that are safe to delete, and stale playgrounds |
+| `/spike <tech> for <use case>` | Start a playground on branch `pg/<slug>` |
+| `/spike resume <slug>` | Pick up where you left off |
+| `/spike index` | Every playground with its verdict and scores (`INDEX.md`) |
+| `/spike compare <slug> <slug>…` | Side-by-side, with a recommendation |
+| `/spike promote <slug>` | Make a throwaway durable |
+| `/spike clean` | Branches that are safe to delete, and stale playgrounds |
 
-If another plugin also has a `playground` skill, use
-`/berno-works-plugin:playground`.
+(It was called `playground` until it clashed with the official
+`playground` plugin. If another plugin ever claims `spike`, use
+`/berno-works-plugin:spike`.)
 
 **Durable** playgrounds merge code and findings into `main`.
 **Throwaway** playgrounds merge only their findings (`FINDINGS.md`,
@@ -133,8 +134,8 @@ the branch until you delete it, and that branch can stay local-only.
 `clean` finds branches whose findings are already on `main`, plus stale
 playgrounds, and deletes the ones you confirm (local and on GitHub).
 
-Mechanical steps run through `skills/playground/scripts/pg.py`, which needs
-only `python3` 3.9 or later. Tests: `bash tests/test-playground.sh`.
+Mechanical steps run through `skills/spike/scripts/pg.py`, which needs
+only `python3` 3.9 or later. Tests: `bash tests/test-spike.sh`.
 
 ## Customizing
 
