@@ -1,2 +1,4 @@
 var/
 .superpowers/
+__pycache__/
+*.pyc

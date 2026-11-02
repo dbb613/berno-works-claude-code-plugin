@@ -22,7 +22,7 @@ PG="python3 <this skill's base directory>/scripts/pg.py"
 | Command | Does |
 |---|---|
 | `$PG init` | Adds `.playgrounds`, `README.md`, `INDEX.md`, `.gitignore` (never overwrites) |
-| `$PG new --tech T --use-case U --kind python\|ts\|infra\|bare --mode guided\|autopilot --durability durable\|throwaway [--question Q]... [--name N]` | Scaffolds `pg/<slug>/`, prints the slug |
+| `$PG new --tech=T --use-case=U --kind=python\|ts\|infra\|bare --mode=guided\|autopilot --durability=durable\|throwaway [--question=Q]... [--name=N]` (always `--flag=value`) | Scaffolds `pg/<slug>/`, prints the slug |
 | `$PG validate [<slug>]` | Checks `playground.json`; run before every commit |
 | `$PG index` | Regenerates `INDEX.md` |
 | `$PG findings-files <slug> [--ref <git-ref>]` | Paths a throwaway merges to `main` (`--ref` reads from a branch, not the working tree) |
