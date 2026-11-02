@@ -335,5 +335,40 @@ test_clean_order
 test_clean_no_origin
 test_clean_missing_base
 
+# ---------- Task 6: skill prose ----------
+SK="$root/skills/playground"
+test_skill_frontmatter() {
+  local name desc
+  name="$(sed -n 's/^name:[[:space:]]*//p' "$SK/SKILL.md" 2>/dev/null | head -1)"
+  desc="$(sed -n 's/^description:[[:space:]]*//p' "$SK/SKILL.md" 2>/dev/null | head -1)"
+  [ "$name" = "playground" ] && [ -n "$desc" ] && pass skill_frontmatter || fail skill_frontmatter "name=$name"
+}
+test_skill_mentions_every_command() {
+  local c missing=""
+  for c in init new resume index compare promote clean; do
+    grep -qw "$c" "$SK/SKILL.md" 2>/dev/null || missing="$missing $c"
+  done
+  [ -z "$missing" ] && pass skill_mentions_every_command || fail skill_mentions_every_command "missing:$missing"
+}
+test_skill_references_exist() {
+  local missing="" r
+  for r in references/workflow-new.md references/rubric.md references/findings-template.md; do
+    grep -q "$r" "$SK/SKILL.md" 2>/dev/null && [ -f "$SK/$r" ] || missing="$missing $r"
+  done
+  [ -z "$missing" ] && pass skill_references_exist || fail skill_references_exist "missing:$missing"
+}
+test_rubric_has_dimensions() {
+  local d missing=""
+  for d in DX Docs Performance Maturity Ecosystem "Ops cost" License; do
+    grep -q "$d" "$SK/references/rubric.md" 2>/dev/null || missing="$missing [$d]"
+  done
+  [ -z "$missing" ] && pass rubric_has_dimensions || fail rubric_has_dimensions "missing:$missing"
+}
+
+test_skill_frontmatter
+test_skill_mentions_every_command
+test_skill_references_exist
+test_rubric_has_dimensions
+
 [ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
 exit $fails
