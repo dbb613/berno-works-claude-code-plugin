@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 import unicodedata
 from pathlib import Path
 
@@ -364,6 +365,53 @@ def cmd_findings_files(args: argparse.Namespace) -> int:
     return 0
 
 
+def read_meta_at(root: Path, ref: str, slug: str) -> dict | None:
+    """playground.json for slug as committed at ref, or None if absent/unreadable."""
+    out = git("show", f"{ref}:pg/{slug}/playground.json", cwd=root)
+    if out.returncode != 0:
+        return None
+    try:
+        meta = json.loads(out.stdout)
+    except ValueError:
+        return None
+    return meta if isinstance(meta, dict) else None
+
+
+def cmd_clean(args: argparse.Namespace) -> int:
+    root = repo_root()
+    require_playgrounds(root)
+    if git("remote", "get-url", "origin", cwd=root).returncode != 0:
+        raise PgError("no 'origin' remote")
+    if git("rev-parse", "--verify", "--quiet", f"{args.base}^{{commit}}", cwd=root).returncode != 0:
+        raise PgError(f"base ref '{args.base}' not found; run git fetch origin")
+    refs = git(
+        "for-each-ref", "--format=%(refname:short)%09%(committerdate:unix)",
+        "refs/remotes/origin/pg/", cwd=root,
+    ).stdout.splitlines()
+    now = time.time()
+    harvested: list[str] = []
+    stale: list[tuple[str, int]] = []
+    for line in refs:
+        ref, _, stamp = line.partition("\t")
+        branch = ref[len("origin/"):]
+        slug = branch[len("pg/"):]
+        if slug.endswith("-findings"):
+            slug = slug[: -len("-findings")]
+        on_base = read_meta_at(root, args.base, slug)
+        if on_base and on_base.get("status") in ("concluded", "abandoned"):
+            harvested.append(branch)
+            continue
+        own = read_meta_at(root, ref, slug)
+        age = int((now - int(stamp or 0)) // 86400)
+        if own and own.get("status") == "active" and age > args.days:
+            stale.append((branch, age))
+    for branch in harvested:
+        print(f"harvested\t{branch}")
+    for branch, age in stale:
+        print(f"stale\t{branch}\t{age}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="pg.py", description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -382,6 +430,10 @@ def build_parser() -> argparse.ArgumentParser:
     f = sub.add_parser("findings-files", help="paths a throwaway merges to main")
     f.add_argument("slug")
     f.set_defaults(func=cmd_findings_files)
+    c = sub.add_parser("clean", help="list harvested and stale pg/* branches")
+    c.add_argument("--base", default="origin/main")
+    c.add_argument("--days", type=int, default=30)
+    c.set_defaults(func=cmd_clean)
     v = sub.add_parser("validate", help="check playground.json files")
     v.add_argument("slug", nargs="?")
     v.set_defaults(func=cmd_validate)
