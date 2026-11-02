@@ -27,13 +27,14 @@ in your summary so the user can correct it.
 On a clean, up-to-date `main` (`git switch main && git pull`):
 
 ```sh
-$PG new --tech "<tech>" --use-case "<use case>" --kind <kind> \
-  --mode <mode> --durability <durability> --question "<q1>" --question "<q2>"
+$PG new --tech="<tech>" --use-case="<use case>" --kind=<kind> \
+  --mode=<mode> --durability=<durability> --question="<q1>" --question="<q2>"
 git switch -c pg/<slug>          # the untracked new files come along
 git add pg/<slug> && git commit -m "pg(<slug>): scaffold"
 ```
 
-Nothing is ever committed on `main` directly. Push a **durable** branch
+Always use the `--flag="value"` form for free text, so a value that starts
+with `-` isn't read as an option. Nothing is ever committed on `main` directly. Push a **durable** branch
 (`git push -u origin pg/<slug>`) so it's backed up. A **throwaway** branch can
 stay local unless the user wants it pushed.
 

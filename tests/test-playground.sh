@@ -465,5 +465,67 @@ test_conclude_throwaway_flow
 test_promote_flow
 test_findings_files_ref_unknown
 
+# ---------- Issues #12-#17 ----------
+M="$tmp/minor"; mkpg "$M"
+newm() { (cd "$M" && pg new --mode guided --durability throwaway --kind bare --date 2026-11-02 "$@"); }
+
+test_markdown_newlines() {  # 12
+  local slug; slug="$(newm --tech $'multi\nline' --use-case $'use\ncase' --question $'q one\nq two')" \
+    || { fail markdown_newlines "exit"; return; }
+  local d="$M/pg/$slug"
+  [ "$(head -1 "$d/README.md")" = "# multi line: use case" ] || { fail markdown_newlines "README title: $(head -2 "$d/README.md")"; return; }
+  grep -qx '### Q1: q one q two' "$d/FINDINGS.md" || { fail markdown_newlines "question heading"; return; }
+  [ "$(jget "$d/playground.json" "d['use_case'] == 'use\ncase'")" = "True" ] || { fail markdown_newlines "raw use_case lost"; return; }
+  pass markdown_newlines
+}
+
+test_findings_suffix_rejected() {  # 13
+  local err rc
+  err="$(newm --tech findings --use-case u 2>&1 >/dev/null)"; rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == *"-findings"* && "$err" == *"--name"* ]] || { fail findings_suffix_rejected "tech: rc=$rc err=$err"; return; }
+  err="$(newm --tech x --name 'Some Findings' --use-case u 2>&1 >/dev/null)"; rc=$?
+  [ $rc -eq 1 ] && [ ! -d "$M/pg/2026-11-02-some-findings" ] && pass findings_suffix_rejected || fail findings_suffix_rejected "name: rc=$rc"
+}
+
+test_name_with_date() {  # 14
+  local slug; slug="$(newm --tech x --name 2026-10-30-dated --use-case u)"
+  [ "$slug" = "2026-11-02-dated" ] && pass name_with_date || fail name_with_date "slug=$slug"
+}
+
+test_new_failure_cleans_up() {  # 15
+  # A lone surrogate (invalid UTF-8 from argv) makes writing the files fail part-way.
+  local err rc; err="$(newm --tech halfbuilt --use-case $'bad \xed\xa0\x80 bytes' 2>&1 >/dev/null)"; rc=$?
+  [ $rc -eq 1 ] && [[ "$err" == pg:* ]] && [[ "$err" != *Traceback* ]] && [ ! -e "$M/pg/2026-11-02-halfbuilt" ] \
+    && pass new_failure_cleans_up || fail new_failure_cleans_up "rc=$rc dir=$(ls "$M/pg" | tr '\n' ' ') err=$(head -c 200 <<<"$err")"
+}
+
+test_explicit_utf8() {  # 16
+  # Python >= 3.10 warns on every implicit-encoding read/write/subprocess; make that an error.
+  local py; py="$(command -v python3.13 || command -v python3)"
+  "$py" -c 'import sys; sys.exit(sys.version_info < (3, 10))' || { pass "explicit_utf8 (skipped: python < 3.10)"; return; }
+  local r="$tmp/utf8"; mkrepo "$r"
+  local out; out="$(cd "$r" && for c in "init" "new --tech=日本語 --name=jp --use-case=日本語のテスト --kind=python --mode=guided --durability=durable --question=質問" \
+      "validate" "index" "findings-files 2026-11-02-jp"; do
+      [ "${c%% *}" = new ] && c="$c --date=2026-11-02"
+      eval "\"$py\" -X warn_default_encoding -W error::EncodingWarning \"$scripts/pg.py\" $c" >/dev/null || exit 1
+    done 2>&1)"; local rc=$?
+  [ $rc -eq 0 ] && pass explicit_utf8 || fail explicit_utf8 "$(grep -m1 -E 'EncodingWarning|Error' <<<"$out")"
+}
+
+test_skill_uses_equals_form() {  # 17
+  local f="$root/skills/playground/references/workflow-new.md"
+  grep -q -- '--tech="<tech>" --use-case="<use case>"' "$f" && ! grep -qE -- '--(tech|use-case|question|name) "' "$f" "$root/skills/playground/SKILL.md" \
+    || { fail skill_uses_equals_form "workflow/SKILL examples still use the space form"; return; }
+  local slug; slug="$(newm --tech=--dash --name=dash --use-case=-u)" && [ "$slug" = "2026-11-02-dash" ] \
+    && pass skill_uses_equals_form || fail skill_uses_equals_form "--tech=--dash failed"
+}
+
+test_markdown_newlines
+test_findings_suffix_rejected
+test_name_with_date
+test_new_failure_cleans_up
+test_explicit_utf8
+test_skill_uses_equals_form
+
 [ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
 exit $fails
