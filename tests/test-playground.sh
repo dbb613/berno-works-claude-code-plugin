@@ -63,5 +63,62 @@ test_requires_marker
 test_not_git
 test_subdir_uses_root
 
+# ---------- Task 2: validate ----------
+# fixture <repo> <slug>: write a valid active playground.json at pg/<slug>/
+fixture() {
+  mkdir -p "$1/pg/$2"
+  cat > "$1/pg/$2/playground.json" <<EOF
+{
+  "slug": "$2",
+  "tech": "httpx",
+  "version": null,
+  "kind": "python",
+  "use_case": "async http client",
+  "mode": "guided",
+  "durability": "throwaway",
+  "status": "active",
+  "created": "2026-11-02",
+  "concluded": null,
+  "questions": [
+    {"id": "Q1", "text": "Does it stream?", "answer": null, "confidence": null, "experiment": null}
+  ],
+  "rubric": {"dx": null, "docs": null, "performance": null, "maturity": null,
+             "ecosystem": null, "ops_cost": null, "license": null},
+  "verdict": null,
+  "verdict_draft": false,
+  "compared_with": []
+}
+EOF
+}
+V="$tmp/val"; mkpg "$V"
+fx="$V/pg/2026-11-02-fx/playground.json"
+# expect_invalid <name> <python mutation> <substring expected in output>
+expect_invalid() {
+  fixture "$V" 2026-11-02-fx; jset "$fx" "$2"
+  local out; out="$(cd "$V" && pg validate 2026-11-02-fx 2>&1)"; local rc=$?
+  [ $rc -eq 1 ] && [[ "$out" == *"$3"* ]] && pass "$1" || fail "$1" "rc=$rc out=$out"
+}
+
+test_validate_ok() {
+  fixture "$V" 2026-11-02-fx
+  local out; out="$(cd "$V" && pg validate 2026-11-02-fx 2>&1)"; local rc=$?
+  [ $rc -eq 0 ] && [ "$out" = "ok 2026-11-02-fx" ] && pass validate_ok || fail validate_ok "rc=$rc out=$out"
+}
+test_validate_ok
+expect_invalid validate_bad_enum "d['verdict']='maybe'" verdict
+expect_invalid validate_missing_field "del d['rubric']" rubric
+expect_invalid validate_bool_score "d['rubric']['dx']=True" dx
+expect_invalid validate_concluded_needs_verdict "d['status']='concluded'; d['concluded']='2026-11-03'" verdict
+expect_invalid validate_unknown_key "d['verdikt']='adopt'" verdikt
+expect_invalid validate_bad_question "d['questions'][0]['answer']='sure'" answer
+
+test_validate_slug_mismatch() {
+  fixture "$V" 2026-11-02-other; jset "$V/pg/2026-11-02-other/playground.json" "d['slug']='2026-11-02-fx'"
+  local out; out="$(cd "$V" && pg validate 2026-11-02-other 2>&1)"; local rc=$?
+  rm -rf "$V/pg/2026-11-02-other"
+  [ $rc -eq 1 ] && [[ "$out" == *slug* ]] && pass validate_slug_mismatch || fail validate_slug_mismatch "rc=$rc out=$out"
+}
+test_validate_slug_mismatch
+
 [ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
 exit $fails

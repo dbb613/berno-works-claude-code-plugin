@@ -9,6 +9,8 @@ Errors exit 1 with a single "pg: ..." line on stderr.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -61,6 +63,148 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+KINDS = ("python", "ts", "infra", "bare")
+RUBRIC_SCORES = ("dx", "docs", "performance", "maturity", "ecosystem", "ops_cost")
+ENUMS = {
+    "kind": KINDS,
+    "mode": ("guided", "autopilot"),
+    "durability": ("durable", "throwaway"),
+    "status": ("active", "concluded", "abandoned"),
+    "verdict": ("adopt", "trial", "hold", "reject", None),
+}
+QUESTION_ENUMS = {
+    "answer": ("yes", "no", "partial", "blocked", None),
+    "confidence": ("high", "medium", "low", None),
+}
+LICENSES = ("ok", "caution", "blocker", None)
+FIELDS = (
+    "slug", "tech", "version", "kind", "use_case", "mode", "durability", "status",
+    "created", "concluded", "questions", "rubric", "verdict", "verdict_draft", "compared_with",
+)
+
+
+def is_date(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        dt.date.fromisoformat(value)
+    except ValueError:
+        return False
+    return len(value) == 10
+
+
+def validate_meta(meta: dict, dir_name: str | None = None) -> list[str]:
+    """Return a list of human-readable problems; empty means valid."""
+    if not isinstance(meta, dict):
+        return ["playground.json must be a JSON object"]
+    errs = [f"missing field '{k}'" for k in FIELDS if k not in meta]
+    errs += [f"unknown field '{k}'" for k in meta if k not in FIELDS]
+    for key, allowed in ENUMS.items():
+        if key in meta and meta[key] not in allowed:
+            errs.append(f"{key} must be one of {', '.join(str(a) for a in allowed)}")
+    for key in ("slug", "tech", "use_case"):
+        if key in meta and not (isinstance(meta[key], str) and meta[key].strip()):
+            errs.append(f"{key} must be a non-empty string")
+    if "version" in meta and meta["version"] is not None and not isinstance(meta["version"], str):
+        errs.append("version must be a string or null")
+    if "created" in meta and not is_date(meta["created"]):
+        errs.append("created must be a YYYY-MM-DD date")
+    if "concluded" in meta and meta["concluded"] is not None and not is_date(meta["concluded"]):
+        errs.append("concluded must be null or a YYYY-MM-DD date")
+    if "verdict_draft" in meta and not isinstance(meta["verdict_draft"], bool):
+        errs.append("verdict_draft must be true or false")
+    if "compared_with" in meta and not (
+        isinstance(meta["compared_with"], list) and all(isinstance(s, str) for s in meta["compared_with"])
+    ):
+        errs.append("compared_with must be a list of slugs")
+    errs += _validate_questions(meta.get("questions", []))
+    errs += _validate_rubric(meta.get("rubric", {}))
+    if meta.get("status") == "concluded":
+        if meta.get("verdict") is None:
+            errs.append("a concluded playground needs a verdict")
+        if meta.get("concluded") is None:
+            errs.append("a concluded playground needs a concluded date")
+        if meta.get("verdict_draft") is True:
+            errs.append("a concluded playground cannot have verdict_draft: true")
+    if dir_name is not None and meta.get("slug") != dir_name:
+        errs.append(f"slug '{meta.get('slug')}' does not match directory '{dir_name}'")
+    return errs
+
+
+def _validate_questions(questions: object) -> list[str]:
+    if not isinstance(questions, list):
+        return ["questions must be a list"]
+    errs: list[str] = []
+    for i, q in enumerate(questions):
+        where = f"questions[{i}]"
+        if not isinstance(q, dict):
+            errs.append(f"{where} must be an object")
+            continue
+        keys = ("id", "text", "answer", "confidence", "experiment")
+        errs += [f"{where} missing '{k}'" for k in keys if k not in q]
+        errs += [f"{where} unknown field '{k}'" for k in q if k not in keys]
+        for k in ("id", "text"):
+            if k in q and not (isinstance(q[k], str) and q[k].strip()):
+                errs.append(f"{where}.{k} must be a non-empty string")
+        for k, allowed in QUESTION_ENUMS.items():
+            if k in q and q[k] not in allowed:
+                errs.append(f"{where}.{k} must be one of {', '.join(str(a) for a in allowed)}")
+        if q.get("experiment") is not None and not isinstance(q["experiment"], str):
+            errs.append(f"{where}.experiment must be a string or null")
+    return errs
+
+
+def _validate_rubric(rubric: object) -> list[str]:
+    if not isinstance(rubric, dict):
+        return ["rubric must be an object"]
+    keys = (*RUBRIC_SCORES, "license")
+    errs = [f"rubric missing '{k}'" for k in keys if k not in rubric]
+    errs += [f"rubric unknown field '{k}'" for k in rubric if k not in keys]
+    for k in RUBRIC_SCORES:
+        v = rubric.get(k)
+        if v is not None and (isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= 5):
+            errs.append(f"rubric.{k} must be an integer 1-5 or null")
+    if rubric.get("license") not in LICENSES:
+        errs.append("rubric.license must be one of ok, caution, blocker, None")
+    return errs
+
+
+def load_meta(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError) as e:
+        raise PgError(f"cannot read {path}: {e}") from None
+
+
+def playground_dirs(root: Path) -> list[Path]:
+    return sorted(p.parent for p in (root / "pg").glob("*/playground.json"))
+
+
+def cmd_validate(args: argparse.Namespace) -> int:
+    root = repo_root()
+    require_playgrounds(root)
+    if args.slug:
+        d = root / "pg" / args.slug
+        if not (d / "playground.json").is_file():
+            raise PgError(f"no playground {args.slug}")
+        dirs = [d]
+    else:
+        dirs = playground_dirs(root)
+    bad = False
+    for d in dirs:
+        try:
+            errs = validate_meta(load_meta(d / "playground.json"), d.name)
+        except PgError as e:
+            errs = [str(e)]
+        for err in errs:
+            print(f"{d.name}: {err}")
+        if errs:
+            bad = True
+        else:
+            print(f"ok {d.name}")
+    return 1 if bad else 0
+
+
 def cmd_index(args: argparse.Namespace) -> int:
     root = repo_root()
     require_playgrounds(root)
@@ -72,6 +216,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="set up a playgrounds repo").set_defaults(func=cmd_init)
     sub.add_parser("index", help="rebuild INDEX.md").set_defaults(func=cmd_index)
+    v = sub.add_parser("validate", help="check playground.json files")
+    v.add_argument("slug", nargs="?")
+    v.set_defaults(func=cmd_validate)
     return p
 
 
