@@ -370,5 +370,24 @@ test_skill_mentions_every_command
 test_skill_references_exist
 test_rubric_has_dimensions
 
+# ---------- Task 7: end to end ----------
+test_e2e() {
+  local r="$tmp/e2e"; mkrepo "$r"
+  local slug
+  slug="$(cd "$r" && pg init >/dev/null && pg new --tech httpx --use-case "async http" --kind python \
+    --mode autopilot --durability throwaway --question "Streams?" --question "HTTP/2?")" || { fail e2e "init/new"; return; }
+  local d="$r/pg/$slug"
+  mkdir -p "$d/experiments/01-x"; echo "ok" > "$d/experiments/01-x/RESULT.md"
+  jset "$d/playground.json" "d.update(status='concluded', concluded='2026-11-03', verdict='adopt', version='0.28.1')
+d['rubric'].update(dx=5, docs=4, performance=4, maturity=4, ecosystem=5, ops_cost=5, license='ok')
+d['questions'][0].update(answer='yes', confidence='high', experiment='01-x')"
+  (cd "$r" && pg validate "$slug" >/dev/null) || { fail e2e "validate"; return; }
+  (cd "$r" && pg index >/dev/null) || { fail e2e "index"; return; }
+  [[ "$(grep "^| \[$slug\]" "$r/INDEX.md")" == *"| 0.28.1 | concluded | adopt | 5 | 4 | 4 | 4 | 5 | 5 | ok |"* ]] || { fail e2e "index row"; return; }
+  (cd "$r" && pg findings-files "$slug") | grep -qx "pg/$slug/experiments/01-x/RESULT.md" || { fail e2e "findings-files"; return; }
+  pass e2e
+}
+test_e2e
+
 [ $fails -eq 0 ] && echo "PASS playground" || echo "$fails failure(s)"
 exit $fails
