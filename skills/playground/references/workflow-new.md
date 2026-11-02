@@ -84,16 +84,24 @@ When the user says they're done (guided) or confirms the draft (autopilot):
 4. Merge to `main` by draft PR:
    - **Durable:**
      ```sh
+     git fetch origin && git merge --no-edit origin/main   # so the index includes everything merged since
      $PG index && git add INDEX.md && git commit -m "pg(<slug>): index" && git push
      ```
+     If that merge conflicts only in `INDEX.md`, take either side and let
+     `$PG index` regenerate it.
      then open a PR from `pg/<slug>` to `main`.
    - **Throwaway:** findings only.
      ```sh
-     git fetch origin && git switch -c pg/<slug>-findings origin/main
-     git checkout pg/<slug> -- $($PG findings-files <slug>)
+     git fetch origin
+     files=$($PG findings-files <slug> --ref origin/pg/<slug>) && [ -n "$files" ]   # stop if this fails
+     git switch -c pg/<slug>-findings origin/main
+     git checkout origin/pg/<slug> -- $files
      $PG index
      git add -A && git commit -m "pg(<slug>): findings" && git push -u origin pg/<slug>-findings
      ```
+     Run these one at a time and check each succeeded. In particular, never
+     run `git checkout origin/pg/<slug> --` with an empty file list: that
+     switches branches instead of copying files.
      then open a PR from `pg/<slug>-findings` to `main`. Tell the user the code
      stays on `pg/<slug>` until `/playground clean`, and `/playground promote`
      can still bring it in.

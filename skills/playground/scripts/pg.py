@@ -351,17 +351,36 @@ def cmd_index(args: argparse.Namespace) -> int:
     return 0
 
 
+def findings_paths(slug: str, files: list[str]) -> list[str]:
+    """The findings subset of a playground's repo-relative file list, in output order."""
+    base = f"pg/{slug}/"
+    present = set(files)
+    fixed = [base + n for n in ("playground.json", "FINDINGS.md", "README.md") if base + n in present]
+    results = sorted(
+        f for f in present
+        if f.startswith(base + "experiments/") and f.count("/") == 4 and f.endswith("/RESULT.md")
+    )
+    return fixed + results
+
+
 def cmd_findings_files(args: argparse.Namespace) -> int:
     root = repo_root()
     require_playgrounds(root)
-    d = root / "pg" / args.slug
-    if not (d / "playground.json").is_file():
-        raise PgError(f"no playground {args.slug}")
-    paths = [d / "playground.json", d / "FINDINGS.md", d / "README.md"]
-    paths += sorted((d / "experiments").glob("*/RESULT.md"))
-    for p in paths:
-        if p.is_file():
-            print(p.relative_to(root).as_posix())
+    slug = args.slug
+    if args.ref:
+        # Read from a git ref, so this works from any checkout (e.g. on main
+        # before switching to the findings branch).
+        out = git("ls-tree", "-r", "--name-only", args.ref, "--", f"pg/{slug}/", cwd=root)
+        files = out.stdout.splitlines() if out.returncode == 0 else []
+        if f"pg/{slug}/playground.json" not in files:
+            raise PgError(f"no playground {slug} at {args.ref}")
+    else:
+        d = root / "pg" / slug
+        if not (d / "playground.json").is_file():
+            raise PgError(f"no playground {slug}")
+        files = [p.relative_to(root).as_posix() for p in d.rglob("*") if p.is_file()]
+    for f in findings_paths(slug, files):
+        print(f)
     return 0
 
 
@@ -429,6 +448,7 @@ def build_parser() -> argparse.ArgumentParser:
     n.set_defaults(func=cmd_new)
     f = sub.add_parser("findings-files", help="paths a throwaway merges to main")
     f.add_argument("slug")
+    f.add_argument("--ref", help="read the playground from this git ref instead of the working tree")
     f.set_defaults(func=cmd_findings_files)
     c = sub.add_parser("clean", help="list harvested and stale pg/* branches")
     c.add_argument("--base", default="origin/main")
